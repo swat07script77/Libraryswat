@@ -1,10 +1,11 @@
 --[[
-    SwatUI Library v10.1 (FINAL CORRIGIDO)
+    SwatUI Library v11 (FINAL)
     Roblox UI Library | PC + Mobile
     - Menu arrasta pela barra de título ✅
-    - Ícones via SetIcons ✅
-    - Nomes das tabs destacados ✅
-    - Nada removido das configurações ✅
+    - Color Picker arrasta sem bugs ✅
+    - Dropdown arrasta sem bugs ✅
+    - Mudança de tema não quebra os pickers ✅
+    - Interface mais arredondada e destacada ✅
 ]]
 
 local SwatUI = {}
@@ -1667,6 +1668,7 @@ local LibraryIcons = {
     ["zoom-out"] = 108334162607319
 }
 
+
 function SwatUI:SetIcons(tbl)
     if type(tbl) == "table" then
         for k, v in pairs(tbl) do
@@ -1680,18 +1682,18 @@ function SwatUI:GetIcons()
 end
 
 -- ============================================================
--- TEMA
+-- TEMA (arredondado e mais destacado)
 -- ============================================================
 local DefaultTheme = {
     Background = Color3.fromRGB(14,16,20), BackgroundAlt = Color3.fromRGB(18,20,25),
-    Panel = Color3.fromRGB(22,24,30), Element = Color3.fromRGB(26,28,35),
-    ElementHover = Color3.fromRGB(36,40,50), ElementActive = Color3.fromRGB(45,30,45),
-    Stroke = Color3.fromRGB(42,46,56), StrokeLight = Color3.fromRGB(60,65,78),
+    Panel = Color3.fromRGB(22,24,30), Element = Color3.fromRGB(28,31,38),
+    ElementHover = Color3.fromRGB(40,44,55), ElementActive = Color3.fromRGB(48,32,48),
+    Stroke = Color3.fromRGB(48,52,64), StrokeLight = Color3.fromRGB(68,74,88),
     Accent = Color3.fromRGB(90,160,255), AccentHover = Color3.fromRGB(120,180,255),
     AccentDark = Color3.fromRGB(40,90,160), Text = Color3.fromRGB(240,245,255),
-    TextDim = Color3.fromRGB(170,180,200), TextMuted = Color3.fromRGB(120,130,150),
+    TextDim = Color3.fromRGB(175,185,205), TextMuted = Color3.fromRGB(125,135,155),
     Success = Color3.fromRGB(80,210,130), Warning = Color3.fromRGB(255,190,70),
-    Error = Color3.fromRGB(240,90,90), CornerRadius = 8,
+    Error = Color3.fromRGB(240,90,90), CornerRadius = 12,
     TitleFont = Enum.Font.GothamBold, ElementFont = Enum.Font.Gotham,
 }
 
@@ -1731,7 +1733,7 @@ end
 local function IsTouchDevice() return UserInputService.TouchEnabled end
 
 -- ============================================================
--- MAKEDRAGGABLE (devolvido!)
+-- MAKEDRAGGABLE GENÉRICO (fix para pickers/dropdowns)
 -- ============================================================
 local function MakeDraggable(frame)
     local dragging, dragStart, startPos
@@ -1754,6 +1756,38 @@ local function MakeDraggable(frame)
         if input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
     end)
+end
+
+-- ============================================================
+-- HELPER: captura input corretamente em qualquer GuiObject
+-- (Resolve o problema de arrastar em color picker e dropdown)
+-- ============================================================
+local function TrackDrag(button, onDrag)
+    local dragging = false
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            onDrag(input, true)
+        end
+    end)
+    local conn = UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+            onDrag(input, false)
+        end
+    end)
+    local conn2 = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    return function()
+        conn:Disconnect()
+        conn2:Disconnect()
+    end
 end
 
 -- ============================================================
@@ -1830,7 +1864,7 @@ end
 
 local function MakeStatusBar(parent, init)
     local bar = Create("Frame", {
-        Size = UDim2.new(0, 5, 0, 20), Position = UDim2.new(0, 10, 0.5, -10),
+        Size = UDim2.new(0, 4, 0, 22), Position = UDim2.new(0, 12, 0.5, -11),
         BackgroundColor3 = statusColor(init or Status.OFF), BorderSizePixel = 0, ZIndex = 2,
     }, { Corner(2) })
     bar.Parent = parent
@@ -1943,41 +1977,41 @@ function SwatUI:CreateWindow(title, size)
         Position = UDim2.new(0.5, -defaultSize.X.Offset / 2, 0.5, -defaultSize.Y.Offset / 2),
         BackgroundColor3 = Theme.Background, BorderSizePixel = 0,
         Active = true, ClipsDescendants = false,
-    }, { Corner(12), Stroke(Theme.Stroke, 1.5) })
+    }, { Corner(16), Stroke(Theme.Stroke, 1.5) })
     main.Parent = gui
     self.MainFrame = main
-    MakeDraggable(main) -- ✅ Menu arrasta pela barra de título
+    MakeDraggable(main)
 
     local titleBar = Create("Frame", {
-        Name = "TitleBar", Size = UDim2.new(1, 0, 0, 40),
+        Name = "TitleBar", Size = UDim2.new(1, 0, 0, 44),
         BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
-    }, { Corner(12) })
+    }, { Corner(16) })
     titleBar.Parent = main
     self.TitleBar = titleBar
 
     local fakeCorner = Create("Frame", {
         Name = "FakeCorner",
-        Size = UDim2.new(1, 0, 0, 12), Position = UDim2.new(0, 0, 1, -12),
+        Size = UDim2.new(1, 0, 0, 16), Position = UDim2.new(0, 0, 1, -16),
         BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0, ZIndex = -1,
     })
     fakeCorner.Parent = titleBar
 
     local titleAccentLine = Create("Frame", {
-        Size = UDim2.new(1, -20, 0, 2), Position = UDim2.new(0, 10, 0, 0),
+        Size = UDim2.new(1, -24, 0, 2), Position = UDim2.new(0, 12, 0, 0),
         BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, ZIndex = 2,
     }, { Corner(2), Gradient(Theme.AccentDark, Theme.Accent, 0) })
     titleAccentLine.Parent = titleBar
 
     local titleAccentDot = Create("Frame", {
-        Size = UDim2.new(0, 7, 0, 7), Position = UDim2.new(0, 14, 0.5, -3.5),
+        Size = UDim2.new(0, 8, 0, 8), Position = UDim2.new(0, 16, 0.5, -4),
         BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, ZIndex = 3,
-    }, { Corner(99), Stroke(Theme.AccentHover, 1) })
+    }, { Corner(99), Stroke(Theme.AccentHover, 1.5) })
     titleAccentDot.Parent = titleBar
 
     local titleLabel = Create("TextLabel", {
-        Size = UDim2.new(1, -220, 1, 0), Position = UDim2.new(0, 28, 0, 0),
+        Size = UDim2.new(1, -240, 1, 0), Position = UDim2.new(0, 32, 0, 0),
         BackgroundTransparency = 1, Text = self.Title:upper(),
-        TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 11,
+        TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 3,
     })
@@ -1985,13 +2019,13 @@ function SwatUI:CreateWindow(title, size)
 
     local function makeTitleButton(text, col, xOffset, txtSize)
         local b = Create("TextButton", {
-            Size = UDim2.new(0, 26, 0, 26),
-            Position = UDim2.new(1, xOffset, 0.5, -13),
+            Size = UDim2.new(0, 28, 0, 28),
+            Position = UDim2.new(1, xOffset, 0.5, -14),
             BackgroundColor3 = col, BorderSizePixel = 0, Text = text,
             TextColor3 = Theme.Text, Font = Enum.Font.GothamBold,
             TextSize = txtSize or 14, AutoButtonColor = false, ZIndex = 3,
             ClipsDescendants = true,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(10), Stroke(Theme.StrokeLight, 1) })
         b.Parent = titleBar
         b.MouseEnter:Connect(function() Tween(b, 0.15, { BackgroundColor3 = col:Lerp(Color3.new(1,1,1), 0.18) }) end)
         b.MouseLeave:Connect(function() Tween(b, 0.15, { BackgroundColor3 = col }) end)
@@ -1999,9 +2033,9 @@ function SwatUI:CreateWindow(title, size)
         return b
     end
 
-    local closeBtn = makeTitleButton("X", Theme.Error, -34, 12)
-    local minBtn   = makeTitleButton("-", Theme.Warning, -66, 16)
-    local gearBtn  = makeTitleButton("⚙️", Theme.Panel, -98, 14)
+    local closeBtn = makeTitleButton("X", Theme.Error, -36, 12)
+    local minBtn   = makeTitleButton("-", Theme.Warning, -70, 16)
+    local gearBtn  = makeTitleButton("⚙️", Theme.Panel, -104, 14)
     gearBtn.TextColor3 = Theme.Accent
 
     self.CloseButton = closeBtn
@@ -2009,13 +2043,13 @@ function SwatUI:CreateWindow(title, size)
     self.SettingsButton = gearBtn
 
     local container = Create("Frame", {
-        Size = UDim2.new(1, 0, 1, -40), Position = UDim2.new(0, 0, 0, 40),
+        Size = UDim2.new(1, 0, 1, -44), Position = UDim2.new(0, 0, 0, 44),
         BackgroundColor3 = Theme.Background, BorderSizePixel = 0,
     })
     container.Parent = main
     self.Container = container
 
-    local tabPanelW = isTouch and 96 or 130
+    local tabPanelW = isTouch and 100 or 140
     local tabPanel = Create("ScrollingFrame", {
         Size = UDim2.new(0, tabPanelW, 1, 0),
         BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
@@ -2029,14 +2063,14 @@ function SwatUI:CreateWindow(title, size)
     tabPanel.Parent = container
     self.TabPanel = tabPanel
 
-    Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5) }).Parent = tabPanel
+    Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }).Parent = tabPanel
     Create("UIPadding", {
-        PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8),
-        PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6),
+        PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
+        PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8),
     }).Parent = tabPanel
 
     Create("Frame", {
-        Size = UDim2.new(0, 1, 1, -20), Position = UDim2.new(0, tabPanelW, 0, 10),
+        Size = UDim2.new(0, 1, 1, -24), Position = UDim2.new(0, tabPanelW, 0, 12),
         BackgroundColor3 = Theme.Stroke, BorderSizePixel = 0,
     }).Parent = container
 
@@ -2049,7 +2083,7 @@ function SwatUI:CreateWindow(title, size)
 
     local tabContainer = Create("ScrollingFrame", {
         Name = "TabContainer",
-        Size = UDim2.new(1, -12, 1, -12), Position = UDim2.new(0, 6, 0, 6),
+        Size = UDim2.new(1, -16, 1, -16), Position = UDim2.new(0, 8, 0, 8),
         BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
         ScrollBarThickness = isTouch and 6 or 4,
         ScrollBarImageColor3 = Theme.StrokeLight,
@@ -2057,21 +2091,21 @@ function SwatUI:CreateWindow(title, size)
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollingDirection = Enum.ScrollingDirection.Y,
         ElasticBehavior = Enum.ElasticBehavior.Never,
-    }, { Corner(10), Stroke(Theme.Stroke, 1) })
+    }, { Corner(14), Stroke(Theme.Stroke, 1) })
     tabContainer.Parent = contentFrame
     self.TabContainer = tabContainer
 
     -- ============ MINI BAR ============
     local miniBar = Create("Frame", {
-        Size = UDim2.new(0, 0, 0, 42), Position = UDim2.new(0.5, 0, 0, 10),
+        Size = UDim2.new(0, 0, 0, 44), Position = UDim2.new(0.5, 0, 0, 10),
         BackgroundColor3 = Theme.Background, BackgroundTransparency = 0.05,
         BorderSizePixel = 0, Visible = false, ZIndex = 500,
-    }, { Corner(21), Stroke(Theme.AccentDark, 1.5) })
+    }, { Corner(22), Stroke(Theme.AccentDark, 1.5) })
     miniBar.Parent = gui
     self.MinimizedFrame = miniBar
 
     Create("Frame", {
-        Size = UDim2.new(1, -24, 0, 2), Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -28, 0, 2), Position = UDim2.new(0, 14, 0, 0),
         BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, ZIndex = 501,
     }, { Corner(2), Gradient(Theme.AccentDark, Theme.Accent, 0) }).Parent = miniBar
 
@@ -2079,7 +2113,7 @@ function SwatUI:CreateWindow(title, size)
         Size = UDim2.new(0.22, 0, 1, 0),
         BackgroundColor3 = Theme.Panel, BackgroundTransparency = 0.4,
         Text = "", BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 501,
-    }, { Corner(21) })
+    }, { Corner(22) })
     dragArea.Parent = miniBar
     Create("Frame", { Size = UDim2.new(0, 12, 1, 0), Position = UDim2.new(1, -12, 0, 0),
         BackgroundColor3 = Theme.Panel, BorderSizePixel = 0, ZIndex = 502 }).Parent = dragArea
@@ -2099,7 +2133,7 @@ function SwatUI:CreateWindow(title, size)
         Size = UDim2.new(0.22, 0, 1, 0), Position = UDim2.new(0.78, 0, 0, 0),
         BackgroundColor3 = Theme.Panel, BackgroundTransparency = 0.4,
         BorderSizePixel = 0, ZIndex = 501,
-    }, { Corner(21) })
+    }, { Corner(22) })
     clockArea.Parent = miniBar
     Create("Frame", { Size = UDim2.new(0, 12, 1, 0), BackgroundColor3 = Theme.Panel,
         BorderSizePixel = 0, ZIndex = 502 }).Parent = clockArea
@@ -2127,12 +2161,12 @@ function SwatUI:CreateWindow(title, size)
         if not self.IsMinimized then return end
         self.IsMinimized = false
         local hideBar = TweenService:Create(miniBar, TweenInfo.new(0.28, Enum.EasingStyle.Sine), {
-            Size = UDim2.new(0, 0, 0, 42), Position = UDim2.new(0.5, 0, 0, 10), BackgroundTransparency = 1,
+            Size = UDim2.new(0, 0, 0, 44), Position = UDim2.new(0.5, 0, 0, 10), BackgroundTransparency = 1,
         })
         hideBar:Play()
         hideBar.Completed:Connect(function()
             miniBar.Visible = false
-            miniBar.Size = UDim2.new(0, 0, 0, 42)
+            miniBar.Size = UDim2.new(0, 0, 0, 44)
             miniBar.Position = UDim2.new(0.5, 0, 0, 10)
             miniBar.BackgroundTransparency = 0.05
         end)
@@ -2184,12 +2218,12 @@ function SwatUI:CreateWindow(title, size)
         hideMain.Completed:Connect(function()
             main.Visible = false
             local barWidth = isTouch and 240 or 260
-            miniBar.Size = UDim2.new(0, 0, 0, 42)
+            miniBar.Size = UDim2.new(0, 0, 0, 44)
             miniBar.Position = UDim2.new(0.5, -barWidth/2, 0, 10)
             miniBar.BackgroundTransparency = 1
             miniBar.Visible = true
             TweenService:Create(miniBar, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, barWidth, 0, 42), BackgroundTransparency = 0.05,
+                Size = UDim2.new(0, barWidth, 0, 44), BackgroundTransparency = 0.05,
             }):Play()
             startClock()
         end)
@@ -2216,9 +2250,9 @@ function SwatUI:CreateWindow(title, size)
     blockButton.Parent = darkOverlay
 
     local confirmFrame = Create("Frame", {
-        Size = UDim2.new(0, 340, 0, 160), Position = UDim2.new(0.5, -170, 0.5, -80),
+        Size = UDim2.new(0, 340, 0, 170), Position = UDim2.new(0.5, -170, 0.5, -85),
         BackgroundColor3 = Theme.Background, BorderSizePixel = 0, Visible = false, ZIndex = 10,
-    }, { Corner(14), Stroke(Theme.AccentDark, 1.5) })
+    }, { Corner(16), Stroke(Theme.AccentDark, 1.5) })
     confirmFrame.Parent = overlayGui
 
     Create("Frame", { Size = UDim2.new(1, -32, 0, 2), Position = UDim2.new(0, 16, 0, 0),
@@ -2226,7 +2260,7 @@ function SwatUI:CreateWindow(title, size)
     }, { Corner(2), Gradient(Theme.AccentDark, Theme.Accent, 0) }).Parent = confirmFrame
 
     local warnCircle = Create("Frame", {
-        Size = UDim2.new(0, 40, 0, 40), Position = UDim2.new(0.5, -20, 0, 20),
+        Size = UDim2.new(0, 42, 0, 42), Position = UDim2.new(0.5, -21, 0, 22),
         BackgroundColor3 = Theme.Warning, BorderSizePixel = 0, ZIndex = 11,
     }, { Corner(99), Stroke(Theme.Warning:Lerp(Color3.new(1,1,1), 0.3), 1.5) })
     warnCircle.Parent = confirmFrame
@@ -2234,31 +2268,31 @@ function SwatUI:CreateWindow(title, size)
     Create("TextLabel", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "!",
         TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 20, ZIndex = 12 }).Parent = warnCircle
 
-    Create("TextLabel", { Size = UDim2.new(1, -30, 0, 20), Position = UDim2.new(0, 15, 0, 68),
+    Create("TextLabel", { Size = UDim2.new(1, -30, 0, 20), Position = UDim2.new(0, 15, 0, 72),
         BackgroundTransparency = 1, Text = "Close Menu", TextColor3 = Theme.Text,
         Font = Enum.Font.GothamBold, TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 11 }).Parent = confirmFrame
 
-    Create("TextLabel", { Size = UDim2.new(1, -40, 0, 18), Position = UDim2.new(0, 20, 0, 90),
-        BackgroundTransparency = 1, Text = "Are you sure you want to close the menu",
+    Create("TextLabel", { Size = UDim2.new(1, -40, 0, 18), Position = UDim2.new(0, 20, 0, 96),
+        BackgroundTransparency = 1, Text = "Are you sure you want to close the menu?",
         TextColor3 = Theme.TextDim, Font = Enum.Font.Gotham, TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 11 }).Parent = confirmFrame
 
     local confirmBtn = Create("TextButton", {
-        Size = UDim2.new(0, 130, 0, 34), Position = UDim2.new(0, 22, 1, -48),
+        Size = UDim2.new(0, 130, 0, 36), Position = UDim2.new(0, 22, 1, -50),
         BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Text = "CONFIRM",
         TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold, TextSize = 12,
         AutoButtonColor = false, ZIndex = 12, ClipsDescendants = true,
-    }, { Corner(8), Stroke(Theme.AccentHover, 1) })
+    }, { Corner(10), Stroke(Theme.AccentHover, 1) })
     confirmBtn.Parent = confirmFrame
     AddButtonGlow(confirmBtn, Theme.Accent)
 
     local cancelBtn = Create("TextButton", {
-        Size = UDim2.new(0, 130, 0, 34), Position = UDim2.new(1, -152, 1, -48),
+        Size = UDim2.new(0, 130, 0, 36), Position = UDim2.new(1, -152, 1, -50),
         BackgroundColor3 = Theme.Element, BorderSizePixel = 0, Text = "CANCEL",
         TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 12,
         AutoButtonColor = false, ZIndex = 12, ClipsDescendants = true,
-    }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
+    }, { Corner(10), Stroke(Theme.StrokeLight, 1) })
     cancelBtn.Parent = confirmFrame
     AddButtonGlow(cancelBtn, Theme.Accent)
 
@@ -2277,8 +2311,8 @@ function SwatUI:CreateWindow(title, size)
         confirmFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         confirmFrame.BackgroundTransparency = 1
         TweenService:Create(confirmFrame, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 340, 0, 160),
-            Position = UDim2.new(0.5, -170, 0.5, -80),
+            Size = UDim2.new(0, 340, 0, 170),
+            Position = UDim2.new(0.5, -170, 0.5, -85),
             BackgroundTransparency = 0,
         }):Play()
     end
@@ -2291,8 +2325,8 @@ function SwatUI:CreateWindow(title, size)
         shrink:Play()
         shrink.Completed:Connect(function()
             blockButton.Visible = false; darkOverlay.Visible = false; confirmFrame.Visible = false
-            confirmFrame.Size = UDim2.new(0, 340, 0, 160)
-            confirmFrame.Position = UDim2.new(0.5, -170, 0.5, -80)
+            confirmFrame.Size = UDim2.new(0, 340, 0, 170)
+            confirmFrame.Position = UDim2.new(0.5, -170, 0.5, -85)
             confirmFrame.BackgroundTransparency = 0
             if cb then cb() end
         end)
@@ -2452,6 +2486,9 @@ function SwatUI:CreateWindow(title, size)
         end
     end
 
+    -- ============================================================
+    -- APLICA TEMA DE COR (fix: NÃO recolore pickers/dropdowns)
+    -- ============================================================
     function self:ApplyThemeColor(colorName)
         local base = ColorThemes[colorName]
         local dark = ColorThemesDark[colorName]
@@ -2471,11 +2508,15 @@ function SwatUI:CreateWindow(title, size)
             ElementActive = dark, StrokeLight = base, Success = base,
         })
 
+        -- Recolore elementos registrados, EXCETO pickers e dropdowns
         for _, el in ipairs(self.Registry.all) do
-            if el.Frame and el.Frame.Parent then
-                recolorTree(el.Frame, oldAccent, oldDark, oldHover, base, dark, hover)
-                if el.Render then pcall(el.Render) end
-                if el.RefreshColor then pcall(el.RefreshColor) end
+            local t = el:GetType()
+            if t ~= "colorPickers" and t ~= "dropdowns" then
+                if el.Frame and el.Frame.Parent then
+                    recolorTree(el.Frame, oldAccent, oldDark, oldHover, base, dark, hover)
+                    if el.Render then pcall(el.Render) end
+                    if el.RefreshColor then pcall(el.RefreshColor) end
+                end
             end
         end
 
@@ -2557,9 +2598,9 @@ function SwatUI:CreateWindow(title, size)
                     if t == "buttons" or t == "toggles" or t == "textboxes"
                        or t == "keybinds" or t == "fontPickers"
                        or t == "themePresets" or t == "colorPickers" then
-                        el.Frame.Size = UDim2.new(1, 0, 0, math.floor((isTouch and 44 or 40) * scale))
+                        el.Frame.Size = UDim2.new(1, 0, 0, math.floor((isTouch and 46 or 42) * scale))
                     elseif t == "sliders" then
-                        el.Frame.Size = UDim2.new(1, 0, 0, math.floor((isTouch and 56 or 50) * scale))
+                        el.Frame.Size = UDim2.new(1, 0, 0, math.floor((isTouch and 58 or 52) * scale))
                     elseif t == "labels" then
                         el.Frame.Size = UDim2.new(1, 0, 0, math.floor(20 * scale))
                     end
@@ -2665,22 +2706,6 @@ function SwatUI:CreateWindow(title, size)
     end
 
     -- ============================================================
-    -- RESET
-    -- ============================================================
-    function self:ResetAllSettings()
-        if isfile and delfile and isfile(SAVE_FILE) then pcall(delfile, SAVE_FILE) end
-        saveData = {}
-        self:SetBackgroundTransparency(0)
-        self:SetElementScale(1.0)
-        self:SetFontScale(1.0)
-        self:ResetTheme()
-        self.ToggleSpeed = 0.2
-        self.ToggleKey = "K"
-        self.SelectedFont = nil
-        restoreOriginalFonts()
-    end
-
-    -- ============================================================
     -- TRANSPARENCY
     -- ============================================================
     function self:SetBackgroundTransparency(pct)
@@ -2758,36 +2783,36 @@ function SwatUI:CreateWindow(title, size)
     -- ============================================================
     -- SETTINGS PANEL
     -- ============================================================
-    local PANEL_WIDTH = 240
-    local PANEL_HEIGHT = 400
+    local PANEL_WIDTH = 250
+    local PANEL_HEIGHT = 420
     local panelRefs = {}
 
     local settingsPanel = Create("Frame", {
         Name = "SettingsPanel",
         Size = UDim2.new(0, PANEL_WIDTH, 0, 0),
-        Position = UDim2.new(1, -(PANEL_WIDTH + 8), 0, 46),
+        Position = UDim2.new(1, -(PANEL_WIDTH + 8), 0, 50),
         BackgroundColor3 = Theme.Panel, BorderSizePixel = 0,
         Visible = false, ClipsDescendants = true, Active = true, ZIndex = 60,
-    }, { Corner(10), Stroke(Theme.AccentDark, 1.5) })
+    }, { Corner(14), Stroke(Theme.AccentDark, 1.5) })
     settingsPanel.Parent = main
     self.SettingsPanel = settingsPanel
 
     local settingsHeaderLine = Create("Frame", {
         Name = "HeaderLine",
-        Size = UDim2.new(1, -16, 0, 2), Position = UDim2.new(0, 8, 0, 0),
+        Size = UDim2.new(1, -20, 0, 2), Position = UDim2.new(0, 10, 0, 0),
         BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, ZIndex = 61,
     }, { Corner(2), Gradient(Theme.AccentDark, Theme.Accent, 0) })
     settingsHeaderLine.Parent = settingsPanel
 
     Create("TextLabel", {
-        Size = UDim2.new(1, -16, 0, 26), Position = UDim2.new(0, 10, 0, 4),
-        BackgroundTransparency = 1, Text = " settings",
-        TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 10,
+        Size = UDim2.new(1, -20, 0, 28), Position = UDim2.new(0, 12, 0, 4),
+        BackgroundTransparency = 1, Text = "⚙  SETTINGS",
+        TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 62,
     }).Parent = settingsPanel
 
     local settingsScroll = Create("ScrollingFrame", {
-        Size = UDim2.new(1, -14, 1, -38), Position = UDim2.new(0, 7, 0, 34),
+        Size = UDim2.new(1, -16, 1, -42), Position = UDim2.new(0, 8, 0, 38),
         BackgroundTransparency = 1, BorderSizePixel = 0,
         ScrollBarThickness = 4, ScrollBarImageColor3 = Theme.AccentDark,
         CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -2796,36 +2821,36 @@ function SwatUI:CreateWindow(title, size)
         ElasticBehavior = Enum.ElasticBehavior.Never, ZIndex = 61,
     })
     settingsScroll.Parent = settingsPanel
-    Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) }).Parent = settingsScroll
-    Create("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 6),
-        PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3) }).Parent = settingsScroll
+    Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }).Parent = settingsScroll
+    Create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 8),
+        PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }).Parent = settingsScroll
 
     local settingsOrder = 0
     local function nextSO() settingsOrder = settingsOrder + 1; return settingsOrder end
 
     local function panelToggle(title, default, onChange)
         local row = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 30),
+            Size = UDim2.new(1, 0, 0, 34),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             LayoutOrder = nextSO(),
-        }, { Corner(6), Stroke(Theme.Stroke, 1) })
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
         row.Parent = settingsScroll
         Create("TextLabel", {
-            Size = UDim2.new(1, -50, 1, 0), Position = UDim2.new(0, 8, 0, 0),
+            Size = UDim2.new(1, -58, 1, 0), Position = UDim2.new(0, 10, 0, 0),
             BackgroundTransparency = 1, Text = title,
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 9,
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
         }).Parent = row
         local pill = Create("Frame", {
-            Size = UDim2.new(0, 34, 0, 18), Position = UDim2.new(1, -42, 0.5, -9),
+            Size = UDim2.new(0, 38, 0, 20), Position = UDim2.new(1, -48, 0.5, -10),
             BackgroundColor3 = default and (self.CurrentAccentColor or Theme.Accent) or Theme.ElementHover,
             BorderSizePixel = 0,
         }, { Corner(99), Stroke(default and (self.CurrentAccentDark or Theme.AccentDark) or Theme.StrokeLight, 1) })
         pill.Parent = row
         local pillStroke = pill:FindFirstChildOfClass("UIStroke")
         local circle = Create("Frame", {
-            Size = UDim2.new(0, 14, 0, 14),
-            Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
+            Size = UDim2.new(0, 16, 0, 16),
+            Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 2,
         }, { Corner(99) })
         circle.Parent = pill
@@ -2840,7 +2865,7 @@ function SwatUI:CreateWindow(title, size)
             if pillStroke then
                 Tween(pillStroke, 0.15, { Color = state and dark or Theme.StrokeLight })
             end
-            Tween(circle, 0.15, { Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7) })
+            Tween(circle, 0.15, { Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8) })
         end
         btn.MouseButton1Click:Connect(function()
             state = not state; render()
@@ -2855,43 +2880,43 @@ function SwatUI:CreateWindow(title, size)
     local function panelSlider(title, min, max, default, onChange, step)
         step = step or 1
         local row = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 38),
+            Size = UDim2.new(1, 0, 0, 44),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             LayoutOrder = nextSO(),
-        }, { Corner(6), Stroke(Theme.Stroke, 1) })
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
         row.Parent = settingsScroll
         local val = math.clamp(default, min, max)
         Create("TextLabel", {
-            Size = UDim2.new(1, -60, 0, 14), Position = UDim2.new(0, 8, 0, 3),
+            Size = UDim2.new(1, -70, 0, 16), Position = UDim2.new(0, 10, 0, 4),
             BackgroundTransparency = 1, Text = title,
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 9,
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
         }).Parent = row
         local valLbl = Create("TextLabel", {
-            Size = UDim2.new(0, 55, 0, 14), Position = UDim2.new(1, -62, 0, 3),
+            Size = UDim2.new(0, 60, 0, 16), Position = UDim2.new(1, -70, 0, 4),
             BackgroundTransparency = 1, Text = (step < 1) and string.format("%.2f", val) or tostring(math.floor(val + 0.5)),
-            TextColor3 = Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 9,
+            TextColor3 = self.CurrentAccentColor or Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Right,
         })
         valLbl.Parent = row
         local bar = Create("Frame", {
-            Size = UDim2.new(1, -16, 0, 4), Position = UDim2.new(0, 8, 0, 24),
+            Size = UDim2.new(1, -20, 0, 5), Position = UDim2.new(0, 10, 0, 28),
             BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
         }, { Corner(99) })
         bar.Parent = row
         local fill = Create("Frame", {
             Size = UDim2.new((val - min) / (max - min), 0, 1, 0),
-            BackgroundColor3 = Theme.Accent, BorderSizePixel = 0,
+            BackgroundColor3 = self.CurrentAccentColor or Theme.Accent, BorderSizePixel = 0,
         }, { Corner(99) })
         fill.Parent = bar
         local knob = Create("Frame", {
-            Size = UDim2.new(0, 10, 0, 10),
-            Position = UDim2.new((val - min) / (max - min), -5, 0.5, -5),
+            Size = UDim2.new(0, 12, 0, 12),
+            Position = UDim2.new((val - min) / (max - min), -6, 0.5, -6),
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 2,
-        }, { Corner(99), Stroke(Theme.Accent, 1.5) })
+        }, { Corner(99), Stroke(self.CurrentAccentColor or Theme.Accent, 1.5) })
         knob.Parent = bar
         local click = Create("TextButton", {
-            Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 0, 18),
+            Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 0, 20),
             BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 3,
         })
         click.Parent = row
@@ -2901,7 +2926,7 @@ function SwatUI:CreateWindow(title, size)
             v = math.floor(v / step + 0.5) * step
             local rel = (v - min) / (max - min)
             fill.Size = UDim2.new(rel, 0, 1, 0)
-            knob.Position = UDim2.new(rel, -5, 0.5, -5)
+            knob.Position = UDim2.new(rel, -6, 0.5, -6)
             valLbl.Text = (step < 1) and string.format("%.2f", v) or tostring(math.floor(v + 0.5))
             if cb and onChange then task.spawn(onChange, v) end
         end
@@ -2909,21 +2934,8 @@ function SwatUI:CreateWindow(title, size)
             local rel = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
             apply(min + (max - min) * rel, true)
         end
-        click.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true; fromX(input.Position.X)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-                or input.UserInputType == Enum.UserInputType.Touch) then
-                fromX(input.Position.X)
-            end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        TrackDrag(click, function(input)
+            fromX(input.Position.X)
         end)
         local api = { SetValue = function(v) apply(v, false) end, GetValue = function() return val end }
         table.insert(panelRefs, { api = api, default = default })
@@ -2932,46 +2944,46 @@ function SwatUI:CreateWindow(title, size)
 
     local function panelDropdown(title, options, default, onChange)
         local row = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 50),
+            Size = UDim2.new(1, 0, 0, 54),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             LayoutOrder = nextSO(), ClipsDescendants = true,
-        }, { Corner(6), Stroke(Theme.Stroke, 1) })
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
         row.Parent = settingsScroll
 
         Create("TextLabel", {
-            Size = UDim2.new(1, -16, 0, 14), Position = UDim2.new(0, 8, 0, 3),
+            Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 4),
             BackgroundTransparency = 1, Text = title,
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 9,
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
         }).Parent = row
 
         local mainBtn = Create("TextButton", {
-            Size = UDim2.new(1, -16, 0, 24), Position = UDim2.new(0, 8, 0, 20),
+            Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 22),
             BackgroundColor3 = Theme.Panel, BorderSizePixel = 0,
             Text = "", AutoButtonColor = false,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         mainBtn.Parent = row
 
         local btnText = Create("TextLabel", {
-            Size = UDim2.new(1, -26, 1, 0), Position = UDim2.new(0, 8, 0, 0),
+            Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 10, 0, 0),
             BackgroundTransparency = 1, Text = default or options[1] or "--",
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 9,
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
         })
         btnText.Parent = mainBtn
 
         local arrow = Create("TextLabel", {
-            Size = UDim2.new(0, 20, 1, 0), Position = UDim2.new(1, -20, 0, 0),
+            Size = UDim2.new(0, 24, 1, 0), Position = UDim2.new(1, -24, 0, 0),
             BackgroundTransparency = 1, Text = "▼",
-            TextColor3 = Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 8,
+            TextColor3 = self.CurrentAccentColor or Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 9,
         })
         arrow.Parent = mainBtn
 
         local listFrame = Create("Frame", {
-            Size = UDim2.new(1, -16, 0, 0), Position = UDim2.new(0, 8, 0, 48),
+            Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 52),
             BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
             Visible = false, ClipsDescendants = true, ZIndex = 65,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         listFrame.Parent = row
 
         local listScroll = Create("ScrollingFrame", {
@@ -2992,8 +3004,8 @@ function SwatUI:CreateWindow(title, size)
             if not isOpen then return end
             isOpen = false
             arrow.Text = "▼"
-            Tween(listFrame, 0.18, { Size = UDim2.new(1, -16, 0, 0) })
-            Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 50) })
+            Tween(listFrame, 0.18, { Size = UDim2.new(1, -20, 0, 0) })
+            Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 54) })
             task.delay(0.19, function() listFrame.Visible = false end)
         end
         local function openList()
@@ -3001,25 +3013,23 @@ function SwatUI:CreateWindow(title, size)
             isOpen = true
             arrow.Text = "▲"
             listFrame.Visible = true
-            local contentH = #options * 22 + 6
-            local finalH = math.min(contentH, 160)
+            local contentH = #options * 24 + 8
+            local finalH = math.min(contentH, 170)
             TweenService:Create(listFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, -16, 0, finalH)
+                Size = UDim2.new(1, -20, 0, finalH)
             }):Play()
             TweenService:Create(row, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, 0, 0, 50 + finalH + 4)
+                Size = UDim2.new(1, 0, 0, 54 + finalH + 6)
             }):Play()
-            task.wait(0.05)
-            listScroll.CanvasSize = UDim2.new(0, 0, 0, contentH)
         end
 
         for i, opt in ipairs(options) do
             local item = Create("TextButton", {
-                Size = UDim2.new(1, -4, 0, 20), BackgroundColor3 = Theme.Element,
+                Size = UDim2.new(1, -6, 0, 22), BackgroundColor3 = Theme.Element,
                 BorderSizePixel = 0, Text = opt, TextColor3 = Theme.TextDim,
-                Font = Enum.Font.Gotham, TextSize = 9, AutoButtonColor = false,
+                Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
                 LayoutOrder = i, ZIndex = 67,
-            }, { Corner(4) })
+            }, { Corner(6) })
             item.Parent = listScroll
             item.MouseEnter:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.ElementHover }) end)
             item.MouseLeave:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.Element }) end)
@@ -3048,44 +3058,44 @@ function SwatUI:CreateWindow(title, size)
 
     local function panelButton(title, color, onClick)
         local btn = Create("TextButton", {
-            Size = UDim2.new(1, 0, 0, 30),
+            Size = UDim2.new(1, 0, 0, 34),
             BackgroundColor3 = color or Theme.Element, BorderSizePixel = 0,
             Text = title, TextColor3 = Theme.Text,
-            Font = Enum.Font.GothamBold, TextSize = 9,
+            Font = Enum.Font.GothamBold, TextSize = 10,
             AutoButtonColor = false, LayoutOrder = nextSO(),
             ClipsDescendants = true,
-        }, { Corner(6), Stroke(Theme.Stroke, 1) })
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
         btn.Parent = settingsScroll
         btn.MouseEnter:Connect(function()
             Tween(btn, 0.15, { BackgroundColor3 = (color or Theme.Element):Lerp(Color3.new(1,1,1), 0.15) })
         end)
         btn.MouseLeave:Connect(function() Tween(btn, 0.15, { BackgroundColor3 = color or Theme.Element }) end)
         btn.MouseButton1Click:Connect(function() if onClick then task.spawn(onClick) end end)
-        AddButtonGlow(btn, Theme.Accent)
+        AddButtonGlow(btn, self.CurrentAccentColor or Theme.Accent)
         return btn
     end
 
     local function panelKeybindPicker(title, default, onChange)
         local row = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 40),
+            Size = UDim2.new(1, 0, 0, 44),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             LayoutOrder = nextSO(),
-        }, { Corner(6), Stroke(Theme.Stroke, 1) })
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
         row.Parent = settingsScroll
 
         Create("TextLabel", {
-            Size = UDim2.new(1, -70, 0, 14), Position = UDim2.new(0, 8, 0, 3),
+            Size = UDim2.new(1, -80, 0, 16), Position = UDim2.new(0, 10, 0, 4),
             BackgroundTransparency = 1, Text = title,
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 9,
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
         }).Parent = row
 
         local keyBtn = Create("TextButton", {
-            Size = UDim2.new(1, -16, 0, 22), Position = UDim2.new(0, 8, 0, 18),
+            Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 20),
             BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
-            Text = default or "K", TextColor3 = Theme.Accent,
-            Font = Enum.Font.GothamBold, TextSize = 9, AutoButtonColor = false,
-        }, { Corner(6), Stroke(Theme.AccentDark, 1.5) })
+            Text = default or "K", TextColor3 = self.CurrentAccentColor or Theme.Accent,
+            Font = Enum.Font.GothamBold, TextSize = 10, AutoButtonColor = false,
+        }, { Corner(8), Stroke(self.CurrentAccentDark or Theme.AccentDark, 1.5) })
         keyBtn.Parent = row
 
         local listening = false
@@ -3093,7 +3103,7 @@ function SwatUI:CreateWindow(title, size)
             if listening then return end
             listening = true
             keyBtn.Text = "..."
-            keyBtn.BackgroundColor3 = Theme.AccentDark
+            keyBtn.BackgroundColor3 = self.CurrentAccentDark or Theme.AccentDark
             keyBtn.TextColor3 = Theme.Text
             local conn
             conn = UserInputService.InputBegan:Connect(function(input, processed)
@@ -3102,14 +3112,14 @@ function SwatUI:CreateWindow(title, size)
                     local keyName = input.KeyCode.Name
                     keyBtn.Text = keyName
                     keyBtn.BackgroundColor3 = Theme.BackgroundAlt
-                    keyBtn.TextColor3 = Theme.Accent
+                    keyBtn.TextColor3 = self.CurrentAccentColor or Theme.Accent
                     listening = false
                     conn:Disconnect()
                     if onChange then task.spawn(onChange, keyName) end
                 elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
                     keyBtn.Text = "Mouse1"
                     keyBtn.BackgroundColor3 = Theme.BackgroundAlt
-                    keyBtn.TextColor3 = Theme.Accent
+                    keyBtn.TextColor3 = self.CurrentAccentColor or Theme.Accent
                     listening = false
                     conn:Disconnect()
                     if onChange then task.spawn(onChange, "Mouse1") end
@@ -3120,7 +3130,7 @@ function SwatUI:CreateWindow(title, size)
                     listening = false
                     keyBtn.Text = default or "K"
                     keyBtn.BackgroundColor3 = Theme.BackgroundAlt
-                    keyBtn.TextColor3 = Theme.Accent
+                    keyBtn.TextColor3 = self.CurrentAccentColor or Theme.Accent
                     conn:Disconnect()
                 end
             end)
@@ -3267,8 +3277,8 @@ function SwatUI:CreateWindow(title, size)
         destroyResize()
         resizeHandle = Create("ImageButton", {
             Name = "SwatResizeHandle",
-            Size = UDim2.new(0, 20, 0, 20),
-            Position = UDim2.new(1, -22, 1, -22),
+            Size = UDim2.new(0, 22, 0, 22),
+            Position = UDim2.new(1, -24, 1, -24),
             BackgroundTransparency = 1,
             Image = LibraryIcons["mouse-pointer-click"] and "rbxassetid://" .. LibraryIcons["mouse-pointer-click"] or "",
             ImageColor3 = Theme.TextMuted,
@@ -3320,8 +3330,8 @@ function SwatUI:CreateWindow(title, size)
         destroyDragBar()
         dragBar = Create("TextButton", {
             Name = "SwatDragBar",
-            Size = UDim2.new(0, 150, 0, 6),
-            Position = UDim2.new(0.5, -75, 1, 6),
+            Size = UDim2.new(0, 160, 0, 6),
+            Position = UDim2.new(0.5, -80, 1, 6),
             BackgroundColor3 = Color3.new(1,1,1),
             BackgroundTransparency = 0.95,
             BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 10,
@@ -3366,58 +3376,48 @@ function SwatUI:CreateWindow(title, size)
         task.defer(function() self:ApplyThemeColor(saveData["ThemeColor"]) end)
     end
 
-    panelButton(" RESET ALL SETTINGS", Theme.Error, function()
-    -- Tudo protegido com pcall para NUNCA dar erro no console
-    pcall(function()
-        if isfile and delfile and isfile(SAVE_FILE) then pcall(delfile, SAVE_FILE) end
-        saveData = {}
+    panelButton("↺ RESET ALL SETTINGS", Theme.Error, function()
+        pcall(function()
+            if isfile and delfile and isfile(SAVE_FILE) then pcall(delfile, SAVE_FILE) end
+            saveData = {}
 
-        for k in pairs(Theme) do Theme[k] = nil end
-        for k, v in pairs(DefaultThemeCopy) do Theme[k] = v end
-        self.CurrentAccentColor = Theme.Accent
-        self.CurrentAccentDark = Theme.AccentDark
-        self.CurrentAccentHover = Theme.AccentHover
+            for k in pairs(Theme) do Theme[k] = nil end
+            for k, v in pairs(DefaultThemeCopy) do Theme[k] = v end
+            self.CurrentAccentColor = Theme.Accent
+            self.CurrentAccentDark = Theme.AccentDark
+            self.CurrentAccentHover = Theme.AccentHover
 
-        for _, ref in ipairs(panelRefs) do
-            if ref.api and ref.api.SetValue then
-                pcall(function() ref.api.SetValue(ref.default) end)
+            for _, ref in ipairs(panelRefs) do
+                if ref.api and ref.api.SetValue then
+                    pcall(function() ref.api.SetValue(ref.default) end)
+                end
             end
-        end
 
-        self.ToggleSpeed = 0.2
-        self.ToggleKey = "K"
-        self.SelectedFont = nil
-        self.CurrentBgTransparency = 0
-        restoreOriginalFonts()
+            self.ToggleSpeed = 0.2
+            self.ToggleKey = "K"
+            self.SelectedFont = nil
+            self.CurrentBgTransparency = 0
+            restoreOriginalFonts()
 
-        self:SetBackgroundTransparency(0)
-        self:SetElementScale(1.0)
-        self:SetFontScale(1.0)
+            self:SetBackgroundTransparency(0)
+            self:SetElementScale(1.0)
+            self:SetFontScale(1.0)
 
-        notifyEnabled = true
-        self.Notify = _realNotify
+            notifyEnabled = true
+            self.Notify = _realNotify
+        end)
+
+        if autoResize then pcall(function() setAutoResize(false) end) end
+        if resizeActive then pcall(function() setResize(false) end) end
+        if dragBarActive then pcall(function() setDragBar(false) end) end
+
+        pcall(function()
+            self:ApplyThemeColor("Blue")
+            persist()
+            self:Notify({ Title = "Reset", Description = "Tudo restaurado!", Duration = 2, Type = "success" })
+        end)
     end)
 
-    -- Desliga autoResize com segurança
-    if autoResize then
-        pcall(function() setAutoResize(false) end)
-    end
-    -- Desliga resize com segurança
-    if resizeActive then
-        pcall(function() setResize(false) end)
-    end
-    -- Desliga dragBar com segurança
-    if dragBarActive then
-        pcall(function() setDragBar(false) end)
-    end
-
-    pcall(function()
-        self:ApplyThemeColor("Blue")
-        persist()
-
-        self:Notify({ Title = "Reset", Description = "Tudo restaurado!", Duration = 2, Type = "success" })
-    end)
-end)
     task.defer(snapshotFonts)
     if saveData["FontScale"] then
         task.defer(function() self:SetFontScale(saveData["FontScale"]) end)
@@ -3494,60 +3494,59 @@ end)
     end
 
     -- ============================================================
-    -- CREATE TAB (nomes destacados ✅)
+    -- CREATE TAB
     -- ============================================================
     function self:CreateTab(name, iconName)
         local tabButton = Create("TextButton", {
-            Size = UDim2.new(1, 0, 0, isTouch and 36 or 32),
+            Size = UDim2.new(1, 0, 0, isTouch and 38 or 34),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             Text = "",
             TextColor3 = Theme.TextDim,
             Font = Theme.ElementFont, TextSize = 11, AutoButtonColor = false,
-        }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
+        }, { Corner(10), Stroke(Theme.Stroke, 1) })
         tabButton.Parent = tabPanel
 
-        local iconOffset = 12
+        local iconOffset = 14
         if iconName and LibraryIcons[iconName] then
             local iconLabel = Create("ImageLabel", {
                 Name = "TabIcon",
-                Size = UDim2.new(0, 16, 0, 16),
-                Position = UDim2.new(0, 10, 0.5, -8),
+                Size = UDim2.new(0, 18, 0, 18),
+                Position = UDim2.new(0, 12, 0.5, -9),
                 BackgroundTransparency = 1,
                 Image = "rbxassetid://" .. LibraryIcons[iconName],
                 ImageColor3 = Theme.TextDim,
                 ZIndex = 2
             })
             iconLabel.Parent = tabButton
-            iconOffset = 34
+            iconOffset = 38
         end
 
-        -- ✅ LABEL DO NOME DA ABA — mais destacado e legível
         local tabLabel = Create("TextLabel", {
             Name = "TabLabel",
             Size = UDim2.new(1, -iconOffset - 8, 1, 0),
             Position = UDim2.new(0, iconOffset, 0, 0),
             BackgroundTransparency = 1,
             Text = name,
-            TextColor3 = Theme.Text,                    -- ✅ Texto claro (não mais TextDim)
-            Font = Enum.Font.GothamBold,                -- ✅ Negrito
-            TextSize = 12,                              -- ✅ Maior
+            TextColor3 = Theme.Text,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
             TextScaled = true,
-            TextStrokeTransparency = 0.6,               -- ✅ Contorno preto (sombra)
+            TextStrokeTransparency = 0.6,
             TextStrokeColor3 = Color3.new(0, 0, 0),
             ZIndex = 2
         })
         tabLabel.Parent = tabButton
-        
+
         local sizeConstraint = Create("UITextSizeConstraint", {
-            MaxTextSize = 12,                           -- ✅ Máximo maior
-            MinTextSize = 9                             -- ✅ Mínimo legível
+            MaxTextSize = 12,
+            MinTextSize = 9
         })
         sizeConstraint.Parent = tabLabel
 
         local indicator = Create("Frame", {
-            Size = UDim2.new(0, 3, 0, 16), Position = UDim2.new(0, -1, 0.5, -8),
+            Size = UDim2.new(0, 3, 0, 18), Position = UDim2.new(0, -1, 0.5, -9),
             BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, BackgroundTransparency = 1,
         }, { Corner(2) })
         indicator.Parent = tabButton
@@ -3558,10 +3557,10 @@ end)
         })
         tabContent.Parent = tabContainer
 
-        Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 7) }).Parent = tabContent
+        Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }).Parent = tabContent
         Create("UIPadding", {
-            PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 9),
-            PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9),
+            PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
+            PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10),
         }).Parent = tabContent
 
         local tab = {
@@ -3623,7 +3622,7 @@ end)
             })
             Tween(tabLabel, 0.2, {
                 TextColor3 = tab._selected and Color3.fromRGB(255, 255, 255) or Theme.Text,
-                Font = Enum.Font.GothamBold, -- ✅ Sempre negrito
+                Font = Enum.Font.GothamBold,
             })
             if tab.Icon then
                 Tween(tab.Icon, 0.2, {
@@ -3652,22 +3651,22 @@ end)
         if not holder then
             holder = Create("Frame", {
                 Name = "Notifications",
-                Size = UDim2.new(0, isTouch and 250 or 280, 1, 0),
-                Position = UDim2.new(1, isTouch and -260 or -290, 0, 80),
+                Size = UDim2.new(0, isTouch and 260 or 290, 1, 0),
+                Position = UDim2.new(1, isTouch and -270 or -300, 0, 90),
                 BackgroundTransparency = 1,
             })
             holder.Parent = gui
             Create("UIListLayout", {
-                SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 7),
+                SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8),
                 VerticalAlignment = Enum.VerticalAlignment.Top,
             }).Parent = holder
         end
 
         local notif = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 60),
+            Size = UDim2.new(1, 0, 0, 64),
             BackgroundColor3 = Theme.Panel, BackgroundTransparency = 1,
             BorderSizePixel = 0, ClipsDescendants = true,
-        }, { Corner(10), Stroke(color, 1) })
+        }, { Corner(12), Stroke(color, 1.5) })
         notif.Parent = holder
         notif.Position = UDim2.new(0, 20, 0, 0)
 
@@ -3677,7 +3676,7 @@ end)
         bar.Parent = notif
 
         local titleLbl = Create("TextLabel", {
-            Size = UDim2.new(1, -40, 0, 18), Position = UDim2.new(0, 14, 0, 8),
+            Size = UDim2.new(1, -40, 0, 18), Position = UDim2.new(0, 16, 0, 8),
             BackgroundTransparency = 1, Text = cfg.Title or "Notice",
             TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1,
@@ -3685,7 +3684,7 @@ end)
         titleLbl.Parent = notif
 
         local descLbl = Create("TextLabel", {
-            Size = UDim2.new(1, -28, 0, 28), Position = UDim2.new(0, 14, 0, 26),
+            Size = UDim2.new(1, -32, 0, 28), Position = UDim2.new(0, 16, 0, 28),
             BackgroundTransparency = 1, Text = cfg.Description or "",
             TextColor3 = Theme.TextDim, Font = Theme.ElementFont, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, TextTransparency = 1,
@@ -3728,7 +3727,7 @@ function SwatUI:_ExtendTab(tab)
 
     function tab:CreateSection(title)
         local sec = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Theme.Panel,
+            Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = Theme.Panel,
             BorderSizePixel = 0, LayoutOrder = nextOrder(), ClipsDescendants = true,
         }, { Corner(Theme.CornerRadius) })
         sec.Parent = content
@@ -3745,9 +3744,9 @@ function SwatUI:_ExtendTab(tab)
         accentBar.Parent = sec
 
         local titleLbl = Create("TextLabel", {
-            Size = UDim2.new(1, -24, 1, 0), Position = UDim2.new(0, 14, 0, 0),
+            Size = UDim2.new(1, -28, 1, 0), Position = UDim2.new(0, 16, 0, 0),
             BackgroundTransparency = 1, Text = title,
-            TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 10,
+            TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left,
         })
         titleLbl.Parent = sec
@@ -3770,7 +3769,7 @@ function SwatUI:_ExtendTab(tab)
     function tab:CreateButton(cfg)
         cfg = cfg or {}
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 44 or 40),
+            Size = UDim2.new(1, 0, 0, isTouch and 46 or 42),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             LayoutOrder = nextOrder(), ClipsDescendants = true,
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
@@ -3779,13 +3778,13 @@ function SwatUI:_ExtendTab(tab)
         local statusBar, setStatus = MakeStatusBar(frame, Status.ACTIVE)
 
         local icon = Create("ImageLabel", {
-            Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(0, 24, 0.5, -8),
-            BackgroundTransparency = 1, Image = "rbxassetid://107150227368485", ImageColor3 = Theme.Accent, ZIndex = 4,
+            Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(0, 26, 0.5, -9),
+            BackgroundTransparency = 1, Image = LibraryIcons["mouse-pointer-click"] and "rbxassetid://" .. LibraryIcons["mouse-pointer-click"] or "", ImageColor3 = Theme.Accent, ZIndex = 4,
         })
         icon.Parent = frame
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -80, 1, 0), Position = UDim2.new(0, 48, 0, 0),
+            Size = UDim2.new(1, -86, 1, 0), Position = UDim2.new(0, 52, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Button",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -3793,9 +3792,9 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = frame
 
         local arrow = Create("TextLabel", {
-            Size = UDim2.new(0, 20, 1, 0), Position = UDim2.new(1, -26, 0, 0),
+            Size = UDim2.new(0, 22, 1, 0), Position = UDim2.new(1, -28, 0, 0),
             BackgroundTransparency = 1, Text = "",
-            TextColor3 = Theme.TextMuted, Font = Enum.Font.GothamBold, TextSize = 15,
+            TextColor3 = Theme.TextMuted, Font = Enum.Font.GothamBold, TextSize = 16,
         })
         arrow.Parent = frame
 
@@ -3807,12 +3806,12 @@ function SwatUI:_ExtendTab(tab)
 
         btn.MouseEnter:Connect(function()
             Tween(frame, 0.15, { BackgroundColor3 = Theme.ElementHover })
-            Tween(arrow, 0.15, { Position = UDim2.new(1, -20, 0, 0), TextColor3 = window.CurrentAccentColor or Theme.Accent })
+            Tween(arrow, 0.15, { Position = UDim2.new(1, -22, 0, 0), TextColor3 = window.CurrentAccentColor or Theme.Accent })
             Tween(icon, 0.15, { ImageColor3 = window.CurrentAccentHover or Theme.AccentHover })
         end)
         btn.MouseLeave:Connect(function()
             Tween(frame, 0.15, { BackgroundColor3 = Theme.Element })
-            Tween(arrow, 0.15, { Position = UDim2.new(1, -26, 0, 0), TextColor3 = Theme.TextMuted })
+            Tween(arrow, 0.15, { Position = UDim2.new(1, -28, 0, 0), TextColor3 = Theme.TextMuted })
             Tween(icon, 0.15, { ImageColor3 = window.CurrentAccentColor or Theme.Accent })
         end)
         btn.MouseButton1Click:Connect(function()
@@ -3838,7 +3837,7 @@ function SwatUI:_ExtendTab(tab)
         el.SetIconColor = function(_, c) icon.ImageColor3 = c end
         el.SetIconSize  = function(_, px)
             icon.Size = UDim2.new(0, px, 0, px)
-            icon.Position = UDim2.new(0, 24, 0.5, -px/2)
+            icon.Position = UDim2.new(0, 26, 0.5, -px/2)
         end
         el.SetIconVisible = function(_, v) icon.Visible = v end
         el.Icon = icon
@@ -3848,7 +3847,7 @@ function SwatUI:_ExtendTab(tab)
 
     function tab:CreateLabel(text)
         local holder = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = nextOrder(),
+            Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = nextOrder(),
         })
         holder.Parent = content
 
@@ -3859,7 +3858,7 @@ function SwatUI:_ExtendTab(tab)
         marker.Parent = holder
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -12, 1, 0), Position = UDim2.new(0, 12, 0, 0),
+            Size = UDim2.new(1, -14, 1, 0), Position = UDim2.new(0, 14, 0, 0),
             BackgroundTransparency = 1, Text = text,
             TextColor3 = Theme.TextDim, Font = Enum.Font.Gotham, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -3883,7 +3882,7 @@ function SwatUI:_ExtendTab(tab)
         local toggled = cfg.Default or false
 
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 44 or 40),
+            Size = UDim2.new(1, 0, 0, isTouch and 46 or 42),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
             LayoutOrder = nextOrder(), ClipsDescendants = true,
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
@@ -3892,7 +3891,7 @@ function SwatUI:_ExtendTab(tab)
         local statusBar, setStatus = MakeStatusBar(frame, toggled and Status.ON or Status.OFF)
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -80, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(1, -86, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Toggle",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -3900,7 +3899,7 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = frame
 
         local bg = Create("Frame", {
-            Size = UDim2.new(0, 48, 0, 22), Position = UDim2.new(1, -60, 0.5, -11),
+            Size = UDim2.new(0, 50, 0, 24), Position = UDim2.new(1, -64, 0.5, -12),
             BackgroundColor3 = toggled and (window.CurrentAccentColor or Theme.Accent) or Theme.ElementHover,
             BorderSizePixel = 0,
         }, { Corner(99) })
@@ -3910,8 +3909,8 @@ function SwatUI:_ExtendTab(tab)
         bgStroke.Parent = bg
 
         local circle = Create("Frame", {
-            Size = UDim2.new(0, 18, 0, 18),
-            Position = toggled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
+            Size = UDim2.new(0, 20, 0, 20),
+            Position = toggled and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10),
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 2,
         }, { Corner(99) })
         circle.Parent = bg
@@ -3927,7 +3926,7 @@ function SwatUI:_ExtendTab(tab)
             Tween(bg, spd, { BackgroundColor3 = toggled and col or Theme.ElementHover })
             Tween(bgStroke, spd, { Color = toggled and dark or Theme.StrokeLight })
             Tween(circle, spd, {
-                Position = toggled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+                Position = toggled and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
             })
             setStatus(toggled and Status.ON or Status.OFF)
         end
@@ -3962,7 +3961,7 @@ function SwatUI:_ExtendTab(tab)
         local value = math.clamp(cfg.Default or min, min, max)
 
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 56 or 50),
+            Size = UDim2.new(1, 0, 0, isTouch and 58 or 52),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0, LayoutOrder = nextOrder(),
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
         frame.Parent = content
@@ -3970,7 +3969,7 @@ function SwatUI:_ExtendTab(tab)
         local statusBar, setStatus = MakeStatusBar(frame, Status.OFF)
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -100, 0, 16), Position = UDim2.new(0, 24, 0, 6),
+            Size = UDim2.new(1, -110, 0, 18), Position = UDim2.new(0, 26, 0, 6),
             BackgroundTransparency = 1, Text = cfg.Title or "Slider",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -3978,9 +3977,9 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = frame
 
         local valBox = Create("Frame", {
-            Size = UDim2.new(0, 56, 0, 22), Position = UDim2.new(1, -68, 0, 5),
+            Size = UDim2.new(0, 60, 0, 24), Position = UDim2.new(1, -74, 0, 5),
             BackgroundColor3 = Theme.Panel, BorderSizePixel = 0, ZIndex = 5,
-        }, { Corner(4), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
         valBox.Parent = frame
 
         local valBtn = Create("TextButton", { Size = UDim2.new(1, 0, 1, 0),
@@ -3999,12 +3998,12 @@ function SwatUI:_ExtendTab(tab)
             BorderSizePixel = 0, Text = tostring(value), TextColor3 = Theme.Accent,
             Font = Enum.Font.GothamBold, TextSize = 10, ClearTextOnFocus = false,
             Visible = false, ZIndex = 8, TextXAlignment = Enum.TextXAlignment.Center,
-        }, { Corner(4), Stroke(Theme.Accent, 1.5) })
+        }, { Corner(6), Stroke(Theme.Accent, 1.5) })
         editBox.Parent = valBox
 
-        local barY = isTouch and 38 or 34
+        local barY = isTouch and 40 or 36
         local bar = Create("Frame", {
-            Size = UDim2.new(1, -24, 0, 5), Position = UDim2.new(0, 12, 0, barY),
+            Size = UDim2.new(1, -28, 0, 5), Position = UDim2.new(0, 14, 0, barY),
             BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
         }, { Corner(99), Stroke(Theme.Stroke, 1) })
         bar.Parent = frame
@@ -4015,7 +4014,7 @@ function SwatUI:_ExtendTab(tab)
         }, { Corner(99), Gradient(Theme.AccentDark, Theme.Accent, 0) })
         fill.Parent = bar
 
-        local knobSize = isTouch and 16 or 12
+        local knobSize = isTouch and 18 or 14
         local knob = Create("Frame", {
             Size = UDim2.new(0, knobSize, 0, knobSize),
             Position = UDim2.new((value - min) / (max - min), -knobSize/2, 0.5, -knobSize/2),
@@ -4025,8 +4024,8 @@ function SwatUI:_ExtendTab(tab)
         local knobStroke = knob:FindFirstChildOfClass("UIStroke")
 
         local click = Create("TextButton", {
-            Size = UDim2.new(1, 0, 0, isTouch and 26 or 22),
-            Position = UDim2.new(0, 0, 0, barY - 6),
+            Size = UDim2.new(1, 0, 0, isTouch and 28 or 24),
+            Position = UDim2.new(0, 0, 0, barY - 8),
             BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 4,
         })
         click.Parent = frame
@@ -4048,21 +4047,8 @@ function SwatUI:_ExtendTab(tab)
             applyValue(min + (max - min) * rel, true)
         end
 
-        click.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true; fromX(input.Position.X)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-                or input.UserInputType == Enum.UserInputType.Touch) then
-                fromX(input.Position.X)
-            end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        TrackDrag(click, function(input)
+            fromX(input.Position.X)
         end)
 
         valBtn.MouseButton1Click:Connect(function()
@@ -4110,7 +4096,7 @@ function SwatUI:_ExtendTab(tab)
         el.SetTitle     = function(_, t) lbl.Text = t end
         el.SetFont      = function(_, f) lbl.Font = f end
         el.SetTextColor = function(_, c) lbl.TextColor3 = c end
-        el.SetBarY      = function(_, y) bar.Position = UDim2.new(0, 12, 0, y) end
+        el.SetBarY      = function(_, y) bar.Position = UDim2.new(0, 14, 0, y) end
         el.RefreshColor = function()
             local c = window.CurrentAccentColor or Theme.Accent
             local cd = window.CurrentAccentDark or Theme.AccentDark
@@ -4131,7 +4117,7 @@ function SwatUI:_ExtendTab(tab)
         local callback = cfg.Callback
         local themeKey = cfg.ThemeKey
 
-        local BASE_HEIGHT = isTouch and 44 or 40
+        local BASE_HEIGHT = isTouch and 46 or 42
         local MAX_HEIGHT = BASE_HEIGHT * 4
 
         local frame = Create("Frame", {
@@ -4154,7 +4140,7 @@ function SwatUI:_ExtendTab(tab)
         header.Parent = inner
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -140, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(1, -150, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = title,
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -4162,34 +4148,34 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = header
 
         local swatchBtn = Create("TextButton", {
-            Size = UDim2.new(0, 70, 0, 28), Position = UDim2.new(1, -82, 0.5, -14),
+            Size = UDim2.new(0, 74, 0, 30), Position = UDim2.new(1, -86, 0.5, -15),
             BackgroundColor3 = defaultColor, BorderSizePixel = 0,
             Text = "", AutoButtonColor = false,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         swatchBtn.Parent = header
 
         local contentHolder = Create("Frame", {
-            Size = UDim2.new(1, -12, 0, 0), Position = UDim2.new(0, 6, 0, BASE_HEIGHT),
+            Size = UDim2.new(1, -14, 0, 0), Position = UDim2.new(0, 7, 0, BASE_HEIGHT),
             BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 3,
         })
         contentHolder.Parent = inner
 
-        local SV_SIZE, HUE_W, PREVIEW_SIZE = 140, 22, 34
+        local SV_SIZE, HUE_W, PREVIEW_SIZE = 150, 24, 38
 
         local svContainer = Create("Frame", {
-            Size = UDim2.new(0, SV_SIZE, 0, SV_SIZE), Position = UDim2.new(0, 12, 0, 12),
+            Size = UDim2.new(0, SV_SIZE, 0, SV_SIZE), Position = UDim2.new(0, 14, 0, 14),
             BorderSizePixel = 0, ZIndex = 5,
-        }, { Corner(6) })
+        }, { Corner(8) })
         svContainer.Parent = contentHolder
 
         local svBase = Create("Frame", {
             Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = defaultColor, BorderSizePixel = 0,
-        }, { Corner(6) })
+        }, { Corner(8) })
         svBase.Parent = svContainer
 
         local satLayer = Create("Frame", {
             Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0,
-        }, { Corner(6) })
+        }, { Corner(8) })
         satLayer.Parent = svContainer
         Create("UIGradient", {
             Transparency = NumberSequence.new{
@@ -4199,7 +4185,7 @@ function SwatUI:_ExtendTab(tab)
 
         local valLayer = Create("Frame", {
             Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(0,0,0), BorderSizePixel = 0,
-        }, { Corner(6) })
+        }, { Corner(8) })
         valLayer.Parent = svContainer
         Create("UIGradient", {
             Rotation = 90,
@@ -4209,7 +4195,7 @@ function SwatUI:_ExtendTab(tab)
         }).Parent = valLayer
 
         local svIndicator = Create("Frame", {
-            Size = UDim2.new(0, 10, 0, 10), AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.new(0, 12, 0, 12), AnchorPoint = Vector2.new(0.5, 0.5),
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 7,
         }, { Corner(99), Stroke(Color3.new(0,0,0), 1.5) })
         svIndicator.Parent = svContainer
@@ -4219,9 +4205,9 @@ function SwatUI:_ExtendTab(tab)
         svButton.Parent = svContainer
 
         local hueBar = Create("Frame", {
-            Size = UDim2.new(0, HUE_W, 0, SV_SIZE), Position = UDim2.new(0, 12 + SV_SIZE + 12, 0, 12),
+            Size = UDim2.new(0, HUE_W, 0, SV_SIZE), Position = UDim2.new(0, 14 + SV_SIZE + 14, 0, 14),
             BorderSizePixel = 0, ZIndex = 5,
-        }, { Corner(6) })
+        }, { Corner(8) })
         hueBar.Parent = contentHolder
         Create("UIGradient", {
             Rotation = 90,
@@ -4237,7 +4223,7 @@ function SwatUI:_ExtendTab(tab)
         }).Parent = hueBar
 
         local hueIndicator = Create("Frame", {
-            Size = UDim2.new(1, 8, 0, 6), AnchorPoint = Vector2.new(0, 0.5),
+            Size = UDim2.new(1, 10, 0, 8), AnchorPoint = Vector2.new(0, 0.5),
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 7,
         }, { Corner(99) })
         hueIndicator.Parent = hueBar
@@ -4248,9 +4234,9 @@ function SwatUI:_ExtendTab(tab)
 
         local preview = Create("Frame", {
             Size = UDim2.new(0, PREVIEW_SIZE, 0, PREVIEW_SIZE),
-            Position = UDim2.new(0, 12 + SV_SIZE + 12 + HUE_W + 12, 0, 12),
+            Position = UDim2.new(0, 14 + SV_SIZE + 14 + HUE_W + 14, 0, 14),
             BackgroundColor3 = defaultColor, BorderSizePixel = 0, ZIndex = 5,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         preview.Parent = contentHolder
 
         local currentColor = defaultColor
@@ -4260,7 +4246,7 @@ function SwatUI:_ExtendTab(tab)
             svBase.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
             preview.BackgroundColor3 = Color3.fromHSV(currentHue, currentSat, currentVal)
             svIndicator.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
-            hueIndicator.Position = UDim2.new(0, -4, currentHue, 0)
+            hueIndicator.Position = UDim2.new(0, -5, currentHue, 0)
         end
         local function applyColor(c, fireCallback)
             currentColor = c
@@ -4272,65 +4258,66 @@ function SwatUI:_ExtendTab(tab)
             if fireCallback and callback then task.spawn(callback, c) end
         end
 
-        local function handleInput(input, frameObj, cb)
-            local size = frameObj.AbsoluteSize
-            local pos = frameObj.AbsolutePosition
-            local x = math.clamp((input.Position.X - pos.X) / size.X, 0, 1)
-            local y = math.clamp((input.Position.Y - pos.Y) / size.Y, 0, 1)
-            cb(x, y)
+        -- ✅ FIX: usar AbsolutePosition capturada no início para arrastar corretamente
+        local dragStartSV, dragStartHue = false, false
+        local startX, startY = 0, 0
+
+        local function handleSV(x, y)
+            local absSize = svContainer.AbsoluteSize
+            local absPos = svContainer.AbsolutePosition
+            local nx = math.clamp((x - absPos.X) / absSize.X, 0, 1)
+            local ny = math.clamp((y - absPos.Y) / absSize.Y, 0, 1)
+            currentSat, currentVal = nx, 1 - ny
+            applyColor(Color3.fromHSV(currentHue, currentSat, currentVal), true)
         end
 
-        local draggingSV, draggingHue = false, false
+        local function handleHue(y)
+            local absSize = hueBar.AbsoluteSize
+            local absPos = hueBar.AbsolutePosition
+            local ny = math.clamp((y - absPos.Y) / absSize.Y, 0, 1)
+            currentHue = ny
+            applyColor(Color3.fromHSV(currentHue, currentSat, currentVal), true)
+        end
+
         svButton.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
                 or input.UserInputType == Enum.UserInputType.Touch then
-                draggingSV = true
-                handleInput(input, svContainer, function(x, y)
-                    currentSat, currentVal = x, 1 - y
-                    applyColor(Color3.fromHSV(currentHue, currentSat, currentVal), true)
-                end)
+                dragStartSV = true
+                handleSV(input.Position.X, input.Position.Y)
             end
         end)
         hueButton.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
                 or input.UserInputType == Enum.UserInputType.Touch then
-                draggingHue = true
-                handleInput(input, hueBar, function(_, y)
-                    currentHue = y
-                    applyColor(Color3.fromHSV(currentHue, currentSat, currentVal), true)
-                end)
+                dragStartHue = true
+                handleHue(input.Position.Y)
             end
         end)
+
         UserInputService.InputChanged:Connect(function(input)
             if input.UserInputType ~= Enum.UserInputType.MouseMovement
                 and input.UserInputType ~= Enum.UserInputType.Touch then return end
-            if draggingSV then
-                handleInput(input, svContainer, function(x, y)
-                    currentSat, currentVal = x, 1 - y
-                    applyColor(Color3.fromHSV(currentHue, currentSat, currentVal), true)
-                end)
-            elseif draggingHue then
-                handleInput(input, hueBar, function(_, y)
-                    currentHue = y
-                    applyColor(Color3.fromHSV(currentHue, currentSat, currentVal), true)
-                end)
+            if dragStartSV then
+                handleSV(input.Position.X, input.Position.Y)
+            elseif dragStartHue then
+                handleHue(input.Position.Y)
             end
         end)
         UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
                 or input.UserInputType == Enum.UserInputType.Touch then
-                draggingSV = false; draggingHue = false
+                dragStartSV = false; dragStartHue = false
             end
         end)
 
-        local CONTENT_HEIGHT = SV_SIZE + 24
+        local CONTENT_HEIGHT = SV_SIZE + 28
         local isOpen = false
         local function openPicker()
             if isOpen then return end
             isOpen = true; setStatus(Status.ON)
             local wanted = math.min(CONTENT_HEIGHT, MAX_HEIGHT - BASE_HEIGHT)
             TweenService:Create(contentHolder, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, -12, 0, wanted)
+                Size = UDim2.new(1, -14, 0, wanted)
             }):Play()
             TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
                 Size = UDim2.new(1, 0, 0, BASE_HEIGHT + wanted + 6)
@@ -4339,7 +4326,7 @@ function SwatUI:_ExtendTab(tab)
         local function closePicker()
             if not isOpen then return end
             isOpen = false; setStatus(Status.OFF)
-            Tween(contentHolder, 0.2, { Size = UDim2.new(1, -12, 0, 0) })
+            Tween(contentHolder, 0.2, { Size = UDim2.new(1, -14, 0, 0) })
             Tween(frame, 0.2, { Size = UDim2.new(1, 0, 0, BASE_HEIGHT) })
         end
         swatchBtn.MouseButton1Click:Connect(function()
@@ -4367,7 +4354,7 @@ function SwatUI:_ExtendTab(tab)
         for i, v in ipairs(cfg.Options or {}) do currentOptions[i] = v end
         local selected = cfg.Default or currentOptions[1] or "Select"
         local callback = cfg.Callback
-        local BASE_HEIGHT = isTouch and 44 or 40
+        local BASE_HEIGHT = isTouch and 46 or 42
         local MAX_HEIGHT = BASE_HEIGHT * 4
 
         local frame = Create("Frame", {
@@ -4390,7 +4377,7 @@ function SwatUI:_ExtendTab(tab)
         header.Parent = inner
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -190, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(1, -200, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Dropdown",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
@@ -4398,13 +4385,13 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = header
 
         local mainBtn = Create("TextButton", {
-            Size = UDim2.new(0, 140, 0, 28), Position = UDim2.new(1, -152, 0.5, -14),
+            Size = UDim2.new(0, 150, 0, 30), Position = UDim2.new(1, -162, 0.5, -15),
             BackgroundColor3 = Theme.Panel, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         mainBtn.Parent = header
 
         local btnText = Create("TextLabel", {
-            Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 10, 0, 0),
+            Size = UDim2.new(1, -44, 1, 0), Position = UDim2.new(0, 12, 0, 0),
             BackgroundTransparency = 1, Text = selected,
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 10,
             TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left,
@@ -4412,19 +4399,19 @@ function SwatUI:_ExtendTab(tab)
         btnText.Parent = mainBtn
 
         local iconLabel = Create("ImageLabel", {
-            Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(1, -22, 0.5, -8),
-            BackgroundTransparency = 1, Image = "rbxassetid://107150227368485", ImageColor3 = Theme.Accent,
+            Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(1, -24, 0.5, -9),
+            BackgroundTransparency = 1, Image = LibraryIcons["chevron-down"] and "rbxassetid://" .. LibraryIcons["chevron-down"] or "", ImageColor3 = Theme.Accent,
         })
         iconLabel.Parent = mainBtn
 
         local closeIcon = Create("ImageLabel", {
-            Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(1, -22, 0.5, -8),
-            BackgroundTransparency = 1, Image = "rbxassetid://122444883127455", ImageColor3 = Theme.Accent, Visible = false,
+            Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(1, -24, 0.5, -9),
+            BackgroundTransparency = 1, Image = LibraryIcons["chevron-up"] and "rbxassetid://" .. LibraryIcons["chevron-up"] or "", ImageColor3 = Theme.Accent, Visible = false,
         })
         closeIcon.Parent = mainBtn
 
         local listHolder = Create("Frame", {
-            Size = UDim2.new(1, -12, 0, 0), Position = UDim2.new(0, 6, 0, BASE_HEIGHT),
+            Size = UDim2.new(1, -14, 0, 0), Position = UDim2.new(0, 7, 0, BASE_HEIGHT),
             BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 3,
         })
         listHolder.Parent = inner
@@ -4445,7 +4432,7 @@ function SwatUI:_ExtendTab(tab)
         local openList, closeList, rebuildList
 
         local function getWantedListHeight()
-            local contentSize = listScroll.UIListLayout.AbsoluteContentSize.Y + 8
+            local contentSize = listScroll.UIListLayout.AbsoluteContentSize.Y + 10
             local listMax = MAX_HEIGHT - BASE_HEIGHT
             return math.min(contentSize, listMax)
         end
@@ -4456,21 +4443,15 @@ function SwatUI:_ExtendTab(tab)
             for i, opt in ipairs(currentOptions) do
                 local isSelected = (opt == selected)
                 local item = Create("TextButton", {
-                    Size = UDim2.new(1, 0, 0, isTouch and 32 or 28),
+                    Size = UDim2.new(1, 0, 0, isTouch and 34 or 30),
                     BackgroundColor3 = isSelected and (window.CurrentAccentDark or Theme.ElementActive) or Theme.Element,
                     BorderSizePixel = 0, Text = "", AutoButtonColor = false,
                     LayoutOrder = i, ZIndex = 5,
-                }, { Corner(5) })
+                }, { Corner(7) })
                 item.Parent = listScroll
 
-                Create("ImageLabel", {
-                    Size = UDim2.new(0, 14, 0, 14), Position = UDim2.new(0, 8, 0.5, -7),
-                    BackgroundTransparency = 1, Image = "rbxassetid://107150227368485",
-                    ImageColor3 = isSelected and (window.CurrentAccentColor or Theme.Accent) or Theme.TextMuted, ZIndex = 6,
-                }).Parent = item
-
                 Create("TextLabel", {
-                    Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 28, 0, 0),
+                    Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 12, 0, 0),
                     BackgroundTransparency = 1, Text = opt,
                     TextColor3 = isSelected and Theme.Text or Theme.TextDim,
                     Font = isSelected and Enum.Font.GothamBold or Enum.Font.Gotham,
@@ -4503,21 +4484,13 @@ function SwatUI:_ExtendTab(tab)
             task.defer(function()
                 task.wait(0.03)
                 local wanted = getWantedListHeight()
-                listHolder.Size = UDim2.new(1, -12, 0, 0)
+                listHolder.Size = UDim2.new(1, -14, 0, 0)
                 TweenService:Create(listHolder, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                    Size = UDim2.new(1, -12, 0, wanted)
+                    Size = UDim2.new(1, -14, 0, wanted)
                 }):Play()
                 TweenService:Create(frame, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
                     Size = UDim2.new(1, 0, 0, BASE_HEIGHT + wanted + 6)
                 }):Play()
-                for i, item in ipairs(optionButtons) do
-                    item.BackgroundTransparency = 1
-                    task.delay(i * 0.02, function()
-                        if item and item.Parent then
-                            Tween(item, 0.15, { BackgroundTransparency = 0 })
-                        end
-                    end)
-                end
             end)
         end
 
@@ -4527,7 +4500,7 @@ function SwatUI:_ExtendTab(tab)
             mainBtn.BackgroundColor3 = Theme.Panel
             iconLabel.Visible = true; closeIcon.Visible = false
             setStatus(Status.OFF)
-            Tween(listHolder, 0.2, { Size = UDim2.new(1, -12, 0, 0) })
+            Tween(listHolder, 0.2, { Size = UDim2.new(1, -14, 0, 0) })
             Tween(frame, 0.2, { Size = UDim2.new(1, 0, 0, BASE_HEIGHT) })
         end
 
@@ -4610,7 +4583,7 @@ function SwatUI:_ExtendTab(tab)
     function tab:CreateTextBox(cfg)
         cfg = cfg or {}
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 44 or 40),
+            Size = UDim2.new(1, 0, 0, isTouch and 46 or 42),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0, LayoutOrder = nextOrder(),
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
         frame.Parent = content
@@ -4619,7 +4592,7 @@ function SwatUI:_ExtendTab(tab)
         local strokeObj = frame:FindFirstChildOfClass("UIStroke")
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(0, 85, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(0, 90, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Text",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -4627,16 +4600,16 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = frame
 
         local box = Create("TextBox", {
-            Size = UDim2.new(1, -120, 0, isTouch and 30 or 26),
-            Position = UDim2.new(0, 110, 0.5, isTouch and -15 or -13),
+            Size = UDim2.new(1, -130, 0, isTouch and 32 or 28),
+            Position = UDim2.new(0, 118, 0.5, isTouch and -16 or -14),
             BackgroundColor3 = Theme.Panel, BorderSizePixel = 0,
             Text = cfg.Default or "", PlaceholderText = cfg.Placeholder or "Type here...",
             TextColor3 = Theme.Text, PlaceholderColor3 = Theme.TextMuted,
             Font = Enum.Font.Gotham, TextSize = 10, ClearTextOnFocus = false,
             TextXAlignment = Enum.TextXAlignment.Left,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         box.Parent = frame
-        Create("UIPadding", { PaddingLeft = UDim.new(0, 8) }).Parent = box
+        Create("UIPadding", { PaddingLeft = UDim.new(0, 10) }).Parent = box
         local boxStroke = box:FindFirstChildOfClass("UIStroke")
 
         box.Focused:Connect(function()
@@ -4670,7 +4643,7 @@ function SwatUI:_ExtendTab(tab)
         local listening = false
 
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 44 or 40),
+            Size = UDim2.new(1, 0, 0, isTouch and 46 or 42),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0, LayoutOrder = nextOrder(),
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
         frame.Parent = content
@@ -4678,7 +4651,7 @@ function SwatUI:_ExtendTab(tab)
         local statusBar, setStatus = MakeStatusBar(frame, Status.OFF)
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -110, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(1, -120, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Keybind",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -4686,12 +4659,12 @@ function SwatUI:_ExtendTab(tab)
         lbl.Parent = frame
 
         local btn = Create("TextButton", {
-            Size = UDim2.new(0, 80, 0, isTouch and 28 or 24),
-            Position = UDim2.new(1, -94, 0.5, isTouch and -14 or -12),
+            Size = UDim2.new(0, 86, 0, isTouch and 30 or 26),
+            Position = UDim2.new(1, -100, 0.5, isTouch and -15 or -13),
             BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
             Text = currentKey, TextColor3 = window.CurrentAccentColor or Theme.Accent,
             Font = Enum.Font.GothamBold, TextSize = 10, AutoButtonColor = false,
-        }, { Corner(6), Stroke(window.CurrentAccentDark or Theme.AccentDark, 1.5) })
+        }, { Corner(8), Stroke(window.CurrentAccentDark or Theme.AccentDark, 1.5) })
         btn.Parent = frame
 
         btn.MouseButton1Click:Connect(function()
@@ -4754,7 +4727,7 @@ function SwatUI:_ExtendTab(tab)
         local target = cfg.Target or "ElementFont"
 
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 44 or 40),
+            Size = UDim2.new(1, 0, 0, isTouch and 46 or 42),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0, LayoutOrder = nextOrder(),
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
         frame.Parent = content
@@ -4762,7 +4735,7 @@ function SwatUI:_ExtendTab(tab)
         local statusBar, setStatus = MakeStatusBar(frame, Status.OFF)
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -180, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(1, -190, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Font",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -4771,11 +4744,11 @@ function SwatUI:_ExtendTab(tab)
 
         local idx = 1
         local fontBtn = Create("TextButton", {
-            Size = UDim2.new(0, 140, 0, isTouch and 28 or 24), Position = UDim2.new(1, -152, 0.5, isTouch and -14 or -12),
+            Size = UDim2.new(0, 150, 0, isTouch and 30 or 26), Position = UDim2.new(1, -162, 0.5, isTouch and -15 or -13),
             BackgroundColor3 = Theme.Panel, BorderSizePixel = 0,
             Text = fonts[1].Name, TextColor3 = Theme.Text,
             Font = fonts[1], TextSize = 10, AutoButtonColor = false,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         fontBtn.Parent = frame
 
         fontBtn.MouseButton1Click:Connect(function()
@@ -4807,7 +4780,7 @@ function SwatUI:_ExtendTab(tab)
         }
 
         local frame = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, isTouch and 44 or 40),
+            Size = UDim2.new(1, 0, 0, isTouch and 46 or 42),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0, LayoutOrder = nextOrder(),
         }, { Corner(Theme.CornerRadius), Stroke(Theme.Stroke, 1) })
         frame.Parent = content
@@ -4815,7 +4788,7 @@ function SwatUI:_ExtendTab(tab)
         local statusBar, setStatus = MakeStatusBar(frame, Status.ACTIVE)
 
         local lbl = Create("TextLabel", {
-            Size = UDim2.new(1, -130, 1, 0), Position = UDim2.new(0, 24, 0, 0),
+            Size = UDim2.new(1, -140, 1, 0), Position = UDim2.new(0, 26, 0, 0),
             BackgroundTransparency = 1, Text = cfg.Title or "Theme Preset",
             TextColor3 = Theme.Text, Font = Theme.ElementFont, TextSize = 10,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -4824,11 +4797,11 @@ function SwatUI:_ExtendTab(tab)
 
         local idx = 1
         local presetBtn = Create("TextButton", {
-            Size = UDim2.new(0, 120, 0, isTouch and 28 or 24), Position = UDim2.new(1, -132, 0.5, isTouch and -14 or -12),
+            Size = UDim2.new(0, 130, 0, isTouch and 30 or 26), Position = UDim2.new(1, -142, 0.5, isTouch and -15 or -13),
             BackgroundColor3 = Theme.Panel, BorderSizePixel = 0,
             Text = presets[1].Name, TextColor3 = Theme.Text,
             Font = Theme.ElementFont, TextSize = 10, AutoButtonColor = false,
-        }, { Corner(6), Stroke(Theme.StrokeLight, 1) })
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
         presetBtn.Parent = frame
 
         presetBtn.MouseButton1Click:Connect(function()
