@@ -3271,7 +3271,141 @@ function SwatUI:CreateWindow(title, size)
     panelDropdown("Theme Color", ColorList, saveData["ThemeColor"] or "Blue", function(name)
         self:ApplyThemeColor(name)
     end)
+-- ============================================================
+-- POSITION SAVE TOGGLES (adicione antes do return self)
+-- Aparecem no painel de settings iguais aos outros toggles.
+-- ============================================================
 
+local saveBigPos = saveData["SaveBigPos"]
+if saveBigPos == nil then saveBigPos = false end
+
+local saveMiniPos = saveData["SaveMiniPos"]
+if saveMiniPos == nil then saveMiniPos = false end
+
+panelToggle("Save Big Menu Position", saveBigPos, function(v)
+    saveBigPos = v
+    saveData["SaveBigPos"] = v
+    persist()
+    if v then
+        -- salva posição atual do menu grande
+        local p = main.Position
+        saveData["BigMenuPos"] = {
+            XS = p.X.Scale, XO = p.X.Offset,
+            YS = p.Y.Scale, YO = p.Y.Offset,
+        }
+        persist()
+    else
+        saveData["BigMenuPos"] = nil
+        persist()
+    end
+end)
+
+panelToggle("Save Mini Menu Position", saveMiniPos, function(v)
+    saveMiniPos = v
+    saveData["SaveMiniPos"] = v
+    persist()
+    if v then
+        -- salva posição atual da barrinha
+        local mini = self.MinimizedFrame
+        if mini then
+            local p = mini.Position
+            saveData["MiniMenuPos"] = {
+                XS = p.X.Scale, XO = p.X.Offset,
+                YS = p.Y.Scale, YO = p.Y.Offset,
+            }
+            persist()
+        end
+    else
+        saveData["MiniMenuPos"] = nil
+        persist()
+    end
+end)
+
+-- ─── Aplicar ao abrir ───
+if saveData["SaveBigPos"] and saveData["BigMenuPos"] then
+    local p = saveData["BigMenuPos"]
+    self.OriginalPosition = UDim2.new(p.XS, p.XO, p.YS, p.YO)
+    main.Position = self.OriginalPosition
+end
+
+if saveData["SaveMiniPos"] and saveData["MiniMenuPos"] then
+    local mini = self.MinimizedFrame
+    if mini then
+        local p = saveData["MiniMenuPos"]
+        mini.Position = UDim2.new(p.XS, p.XO, p.YS, p.YO)
+    end
+end
+
+-- ─── Salvar posição toda vez que mover ───
+main:GetPropertyChangedSignal("Position"):Connect(function()
+    if not saveData["SaveBigPos"] then return end
+    local p = main.Position
+    saveData["BigMenuPos"] = {
+        XS = p.X.Scale, XO = p.X.Offset,
+        YS = p.Y.Scale, YO = p.Y.Offset,
+    }
+    persist()
+end)
+
+self.MinimizedFrame:GetPropertyChangedSignal("Position"):Connect(function()
+    if not saveData["SaveMiniPos"] then return end
+    local p = self.MinimizedFrame.Position
+    saveData["MiniMenuPos"] = {
+        XS = p.X.Scale, XO = p.X.Offset,
+        YS = p.Y.Scale, YO = p.Y.Offset,
+    }
+    persist()
+end)
+-- ============================================================
+-- AUTO RELOAD ON TELEPORT
+-- Cola isso depois de criar a ConfigTab e o sistema de save
+-- ============================================================
+
+local function setupAutoReload(ConfigTab, createSavedToggle, Notify, scriptUrl)
+    if not ConfigTab then
+        warn("ConfigTab não encontrada")
+        return
+    end
+
+    -- fallback pra executores que usam nomes diferentes
+    local queueFn = queue_on_teleport or queueonteleport or syn and syn.queue_on_teleport or fluxus and fluxus.queue_on_teleport
+
+    if not queueFn then
+        warn("Executor não suporta queue_on_teleport")
+        return
+    end
+
+    local autoReconnectActive = createSavedToggle("Auto Reload", ConfigTab, false, function(value)
+        if value then
+            if Notify then Notify("Auto Reload", "Ativado — script vai recarregar ao trocar de servidor", 2) end
+        else
+            if Notify then Notify("Auto Reload", "Desativado", 1) end
+        end
+    end)
+
+    -- pega o valor atual do toggle (depende da sua lib)
+    local function isEnabled()
+        if type(autoReconnectActive) == "table" then
+            if autoReconnectActive.Value ~= nil then return autoReconnectActive.Value end
+            if autoReconnectActive.GetValue then return autoReconnectActive:GetValue() end
+        end
+        return autoReconnectActive == true
+    end
+
+    local teleportCheck = false
+
+    game:GetService("Players").LocalPlayer.OnTeleport:Connect(function()
+        if teleportCheck then return end
+        if not isEnabled() then return end
+        teleportCheck = true
+        queueFn('loadstring(game:HttpGet("' .. scriptUrl .. '"))()')
+    end)
+
+    print("[AutoReload] loaded")
+end
+
+-- Uso (no seu script, depois de criar a ConfigTab):
+-- setupAutoReload(ConfigTab, createSavedToggle, Notify, "https://pastebin.com/raw/SEU_ID_AQUI")
     if saveData["ThemeColor"] and ColorThemes[saveData["ThemeColor"]] then
         task.defer(function() self:ApplyThemeColor(saveData["ThemeColor"]) end)
     end
