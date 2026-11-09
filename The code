@@ -1,12 +1,15 @@
-
 --[[
-    SwatUI Library v13 (FINAL)
+    SwatUI Library v14 (FINAL - Enhanced)
     - Menu SEMPRE por cima de TUDO (CoreGui + DisplayOrder máximo) ✅
-    - Elementos aparecem corretamente (ZIndexBehavior.Sibling) ✅
     - Cor mais chamativa sem exagero ✅
     - Efeito "segurar aba" (destaca e volta) ✅
     - Color Picker / Dropdown estáveis ✅
-    - Otimizado (menos conexões, tweens gerenciados) ✅
+    - + Animação GLOBAL (afeta tudo) ✅
+    - + 2 modos de minimize: SetMinimizeMode("Mini"/"Large") ✅
+    - Ambos mantém a POSIÇÃO REAL do usuário ✅
+    - + Color picker recolore UI inteira em tempo real ✅
+    - + Visual mais vivo ✅
+    - SEM ícones (você adiciona via SetIcons) ✅
 ]]
 
 local SwatUI = {}
@@ -18,9 +21,6 @@ local TweenService     = game:GetService("TweenService")
 local HttpService      = game:GetService("HttpService")
 local LocalPlayer      = Players.LocalPlayer
 
--- ============================================================
--- BANCO DE ÍCONES (vazio — você adiciona via SetIcons)
--- ============================================================
 local LibraryIcons = {
     ["a-arrow-down"] = 92867583610071,
     ["a-arrow-up"] = 132318504999733,
@@ -1669,7 +1669,6 @@ local LibraryIcons = {
     ["zoom-out"] = 108334162607319
 }
 
-
 function SwatUI:SetIcons(tbl)
     if type(tbl) == "table" then
         for k, v in pairs(tbl) do LibraryIcons[k] = v end
@@ -1678,25 +1677,41 @@ end
 function SwatUI:GetIcons() return LibraryIcons end
 
 -- ============================================================
--- TEMA
+-- TEMA (cores mais vivas)
 -- ============================================================
 local DefaultTheme = {
-    Background = Color3.fromRGB(13,15,20), BackgroundAlt = Color3.fromRGB(17,20,27),
-    Panel = Color3.fromRGB(22,25,32), Element = Color3.fromRGB(30,34,44),
-    ElementHover = Color3.fromRGB(44,50,64), ElementActive = Color3.fromRGB(52,36,52),
-    Stroke = Color3.fromRGB(52,58,74), StrokeLight = Color3.fromRGB(78,86,104),
-    Accent = Color3.fromRGB(96,176,255), AccentHover = Color3.fromRGB(140,200,255),
-    AccentDark = Color3.fromRGB(44,100,178), Text = Color3.fromRGB(244,248,255),
-    TextDim = Color3.fromRGB(180,190,210), TextMuted = Color3.fromRGB(130,142,164),
-    Success = Color3.fromRGB(88,220,140), Warning = Color3.fromRGB(255,196,84),
-    Error = Color3.fromRGB(255,100,100), CornerRadius = 13,
-    TitleFont = Enum.Font.GothamBold, ElementFont = Enum.Font.Gotham,
+    Background = Color3.fromRGB(10, 12, 18),
+    BackgroundAlt = Color3.fromRGB(15, 18, 26),
+    Panel = Color3.fromRGB(20, 24, 33),
+    Element = Color3.fromRGB(28, 33, 44),
+    ElementHover = Color3.fromRGB(45, 52, 68),
+    ElementActive = Color3.fromRGB(70, 40, 90),
+    Stroke = Color3.fromRGB(60, 68, 88),
+    StrokeLight = Color3.fromRGB(100, 110, 135),
+    Accent = Color3.fromRGB(130, 190, 255),
+    AccentHover = Color3.fromRGB(180, 220, 255),
+    AccentDark = Color3.fromRGB(60, 110, 200),
+    Text = Color3.fromRGB(250, 252, 255),
+    TextDim = Color3.fromRGB(195, 205, 225),
+    TextMuted = Color3.fromRGB(140, 152, 175),
+    Success = Color3.fromRGB(100, 240, 160),
+    Warning = Color3.fromRGB(255, 210, 100),
+    Error = Color3.fromRGB(255, 110, 120),
+    CornerRadius = 14,
+    TitleFont = Enum.Font.GothamBold,
+    ElementFont = Enum.Font.Gotham,
 }
 
 local Theme = {}
 for k, v in pairs(DefaultTheme) do Theme[k] = v end
 local DefaultThemeCopy = {}
 for k, v in pairs(DefaultTheme) do DefaultThemeCopy[k] = v end
+
+-- ✅ MULTIPLICADOR GLOBAL DE ANIMAÇÃO
+local AnimSpeed = 1.0
+local function AnimTime(base)
+    return (base or 0.2) / math.max(AnimSpeed, 0.05)
+end
 
 local Status = { OFF = "off", ACTIVE = "active", ON = "on" }
 local function statusColor(s)
@@ -1720,7 +1735,16 @@ local function Gradient(c1, c2, rot)
     return Create("UIGradient", { Color = ColorSequence.new(c1, c2), Rotation = rot or 0 })
 end
 local function Tween(inst, t, props)
-    local tw = TweenService:Create(inst, TweenInfo.new(t or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+    local tw = TweenService:Create(inst,
+        TweenInfo.new(AnimTime(t or 0.18), Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        props)
+    tw:Play()
+    return tw
+end
+local function TweenBack(inst, t, props)
+    local tw = TweenService:Create(inst,
+        TweenInfo.new(AnimTime(t or 0.32), Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        props)
     tw:Play()
     return tw
 end
@@ -1818,7 +1842,7 @@ local function AddButtonGlow(button, accentColor)
             active = true
             glow.BackgroundColor3 = accentColor or Color3.new(1, 1, 1)
             updateGlow(input.Position.X, input.Position.Y)
-            Tween(glow, 0.15, { BackgroundTransparency = 0.72, Size = UDim2.new(0, 95, 0, 95) })
+            Tween(glow, 0.15, { BackgroundTransparency = 0.55, Size = UDim2.new(0, 120, 0, 120) })
             conn = UserInputService.InputChanged:Connect(function(i)
                 if not active then return end
                 if i.UserInputType == Enum.UserInputType.MouseMovement
@@ -1834,7 +1858,7 @@ local function AddButtonGlow(button, accentColor)
             if not active then return end
             active = false
             if conn then conn:Disconnect(); conn = nil end
-            Tween(glow, 0.2, { BackgroundTransparency = 1, Size = UDim2.new(0, 60, 0, 60) })
+            Tween(glow, 0.25, { BackgroundTransparency = 1, Size = UDim2.new(0, 60, 0, 60) })
         end
     end)
     return glow
@@ -1881,15 +1905,15 @@ local function NewElement(type, baseFrame)
         n = n or 3; d = d or 0.15
         task.spawn(function()
             for i = 1, n do
-                baseFrame.BackgroundTransparency = 0.4; task.wait(d)
-                baseFrame.BackgroundTransparency = 0; task.wait(d)
+                baseFrame.BackgroundTransparency = 0.4; task.wait(AnimTime(d))
+                baseFrame.BackgroundTransparency = 0; task.wait(AnimTime(d))
             end
         end)
     end
     el.FlashColor = function(_, color, back, dur)
         back = back or baseFrame.BackgroundColor3; dur = dur or 0.3
         Tween(baseFrame, dur, { BackgroundColor3 = color })
-        task.delay(dur * 2, function() Tween(baseFrame, dur, { BackgroundColor3 = back }) end)
+        task.delay(AnimTime(dur * 2), function() Tween(baseFrame, dur, { BackgroundColor3 = back }) end)
     end
     el.AnimateColor = function(_, color, dur) Tween(baseFrame, dur or 0.3, { BackgroundColor3 = color }) end
     return el
@@ -1914,6 +1938,8 @@ function SwatUI:CreateWindow(title, size)
     self.FontScale = 1.0
     self.ElementScale = 1.0
     self.SelectedFont = nil
+    self.AnimSpeed = 1.0
+    self.MinimizeMode = "Mini"
 
     self.Registry = {
         buttons = {}, toggles = {}, sliders = {}, dropdowns = {},
@@ -1935,8 +1961,6 @@ function SwatUI:CreateWindow(title, size)
     self.Size = defaultSize
     self.DefaultSize = defaultSize
 
-    -- ✅ FIX: ZIndexBehavior.Sibling (funciona normalmente com hierarquia)
-    -- + CoreGui + DisplayOrder máximo = por cima de TUDO sem quebrar elementos
     local gui = Create("ScreenGui", {
         Name = "SwatUI", ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -2140,32 +2164,48 @@ function SwatUI:CreateWindow(title, size)
         end)
     end
 
+    -- ✅ POSIÇÃO REAL SALVA (sem fake)
+    local savedMainPos = nil
+
     local function restoreWindow()
         if not self.IsMinimized then return end
         self.IsMinimized = false
-        TweenService:Create(miniBar, TweenInfo.new(0.28, Enum.EasingStyle.Sine), {
-            Size = UDim2.new(0, 0, 0, 44), Position = UDim2.new(0.5, 0, 0, 10), BackgroundTransparency = 1,
-        }):Play()
-        task.delay(0.3, function()
+
+        if self.MinimizeMode == "Large" then
+            container.Visible = true
             miniBar.Visible = false
-            miniBar.Size = UDim2.new(0, 0, 0, 44)
-            miniBar.Position = UDim2.new(0.5, 0, 0, 10)
-            miniBar.BackgroundTransparency = 0.05
-        end)
-        main.Visible = true
-        main.Size = UDim2.new(0, 0, 0, 0)
-        main.Position = UDim2.new(0.5, 0, 0.5, 0)
-        main.BackgroundTransparency = 1
-        local bgT = self.CurrentBgTransparency or 0
-        local tween = TweenService:Create(main, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            BackgroundTransparency = bgT,
-            Size = self.Size,
-            Position = self.OriginalPosition or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2),
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
-            self:SetBackgroundTransparency((self.CurrentBgTransparency or 0) * 100)
-        end)
+            TweenBack(main, 0.32, {
+                Size = self.Size,
+                Position = savedMainPos or self.OriginalPosition or
+                    UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2),
+            })
+        else
+            Tween(miniBar, 0.28, {
+                Size = UDim2.new(0, 0, 0, 44),
+                Position = UDim2.new(0.5, 0, 0, 10),
+                BackgroundTransparency = 1,
+            })
+            task.delay(AnimTime(0.3), function()
+                miniBar.Visible = false
+                miniBar.Size = UDim2.new(0, 0, 0, 44)
+                miniBar.Position = UDim2.new(0.5, 0, 0, 10)
+                miniBar.BackgroundTransparency = 0.05
+            end)
+            main.Visible = true
+            main.Size = UDim2.new(0, 0, 0, 0)
+            -- ✅ USA A POSIÇÃO REAL SALVA
+            main.Position = savedMainPos or self.OriginalPosition or UDim2.new(0.5, 0, 0.5, 0)
+            main.BackgroundTransparency = 1
+            local bgT = self.CurrentBgTransparency or 0
+            local tween = TweenBack(main, 0.35, {
+                BackgroundTransparency = bgT,
+                Size = self.Size,
+            })
+            tween.Completed:Connect(function()
+                self:SetBackgroundTransparency((self.CurrentBgTransparency or 0) * 100)
+            end)
+        end
+        container.Visible = true
     end
     centerBtn.MouseButton1Click:Connect(restoreWindow)
 
@@ -2189,33 +2229,72 @@ function SwatUI:CreateWindow(title, size)
             or input.UserInputType == Enum.UserInputType.Touch then draggingMini = false end
     end)
 
-    local function minimizeWindow()
+    local function minimizeWindow(mode)
         if self.IsMinimized then return end
         self.IsMinimized = true
-        if not self.OriginalPosition then self.OriginalPosition = main.Position end
-        local hideMain = TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {
-            BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0),
-        })
-        hideMain:Play()
-        hideMain.Completed:Connect(function()
-            main.Visible = false
-            local barWidth = isTouch and 240 or 260
-            miniBar.Size = UDim2.new(0, 0, 0, 44)
-            miniBar.Position = UDim2.new(0.5, -barWidth/2, 0, 10)
-            miniBar.BackgroundTransparency = 1
-            miniBar.Visible = true
-            TweenService:Create(miniBar, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, barWidth, 0, 44), BackgroundTransparency = 0.05,
-            }):Play()
-            startClock()
-        end)
+        mode = mode or self.MinimizeMode or "Mini"
+
+        -- ✅ SALVA POSIÇÃO REAL DO MAIN
+        savedMainPos = main.Position
+        if not self.OriginalPosition then self.OriginalPosition = savedMainPos end
+
+        if mode == "Mini" then
+            local hideMain = TweenService:Create(main,
+                TweenInfo.new(AnimTime(0.3), Enum.EasingStyle.Sine),
+                { BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0),
+                  Position = UDim2.new(0.5, 0, 0.5, 0) })
+            hideMain:Play()
+            hideMain.Completed:Connect(function()
+                main.Visible = false
+                local barWidth = isTouch and 240 or 260
+                -- ✅ USA A POSIÇÃO REAL SALVA
+                miniBar.Size = UDim2.new(0, 0, 0, 44)
+                miniBar.Position = savedMainPos
+                miniBar.BackgroundTransparency = 1
+                miniBar.Visible = true
+                TweenBack(miniBar, 0.32, {
+                    Size = UDim2.new(0, barWidth, 0, 44),
+                    BackgroundTransparency = 0.05,
+                })
+                startClock()
+            end)
+        else
+            -- Large: janela reduzida mantendo posição
+            miniBar.Visible = false
+            container.Visible = false
+            main.Visible = true
+            Tween(main, 0.28, {
+                Size = UDim2.new(0, isTouch and 260 or 300, 0, 120),
+                BackgroundColor3 = Theme.Panel,
+            })
+        end
     end
     minBtn.MouseButton1Click:Connect(function()
-        if self.IsMinimized then restoreWindow() else minimizeWindow() end
+        if self.IsMinimized then restoreWindow() else minimizeWindow(self.MinimizeMode or "Mini") end
     end)
 
     self.RestoreWindow = restoreWindow
     self.MinimizeWindow = minimizeWindow
+
+    -- ✅ NOVA FUNÇÃO: SetMinimizeMode("Mini" | "Large")
+    function self:SetMinimizeMode(mode)
+        mode = (mode == "Large") and "Large" or "Mini"
+        self.MinimizeMode = mode
+        saveData["MinimizeMode"] = mode
+        persist()
+
+        if not self.IsMinimized then return end
+
+        if mode == "Mini" then
+            miniBar.Visible = true
+            miniBar.Size = UDim2.new(0, isTouch and 240 or 260, 0, 44)
+        else
+            miniBar.Visible = false
+            container.Visible = false
+            main.Visible = true
+            main.Size = UDim2.new(0, isTouch and 260 or 300, 0, 120)
+        end
+    end
 
     -- ============ CONFIRM DIALOG ============
     local darkOverlay = Create("Frame", {
@@ -2291,18 +2370,18 @@ function SwatUI:CreateWindow(title, size)
         confirmFrame.Size = UDim2.new(0, 0, 0, 0)
         confirmFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         confirmFrame.BackgroundTransparency = 1
-        TweenService:Create(confirmFrame, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TweenBack(confirmFrame, 0.32, {
             Size = UDim2.new(0, 340, 0, 170),
             Position = UDim2.new(0.5, -170, 0.5, -85),
             BackgroundTransparency = 0,
-        }):Play()
+        })
     end
 
     local function hideConfirmDialog(cb)
         confirmActive = false
-        local shrink = TweenService:Create(confirmFrame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1,
-        })
+        local shrink = TweenService:Create(confirmFrame,
+            TweenInfo.new(AnimTime(0.2), Enum.EasingStyle.Back, Enum.EasingDirection.In),
+            { Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1 })
         shrink:Play()
         shrink.Completed:Connect(function()
             blockButton.Visible = false; darkOverlay.Visible = false; confirmFrame.Visible = false
@@ -2320,9 +2399,10 @@ function SwatUI:CreateWindow(title, size)
     confirmBtn.MouseButton1Click:Connect(function()
         if not confirmActive then return end
         hideConfirmDialog(function()
-            local closeMain = TweenService:Create(main, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1,
-            })
+            local closeMain = TweenService:Create(main,
+                TweenInfo.new(AnimTime(0.28), Enum.EasingStyle.Back, Enum.EasingDirection.In),
+                { Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0),
+                  BackgroundTransparency = 1 })
             closeMain:Play()
             closeMain.Completed:Connect(function() gui:Destroy() overlayGui:Destroy() end)
         end)
@@ -2358,6 +2438,25 @@ function SwatUI:CreateWindow(title, size)
         local ok, encoded = pcall(function() return HttpService:JSONEncode(saveData) end)
         if not ok then return false end
         return pcall(writefile, SAVE_FILE, encoded)
+    end
+
+    -- ✅ Restaura MinimizeMode
+    if saveData["MinimizeMode"] then
+        self.MinimizeMode = saveData["MinimizeMode"]
+    end
+
+    -- ============================================================
+    -- ANIMATION SPEED (global)
+    -- ============================================================
+    self.AnimSpeed = saveData["AnimSpeed"] or 1.0
+    AnimSpeed = self.AnimSpeed
+
+    function self:SetAnimationSpeed(v)
+        v = math.clamp(v, 0.25, 3.0)
+        self.AnimSpeed = v
+        AnimSpeed = v
+        saveData["AnimSpeed"] = v
+        persist()
     end
 
     -- ============================================================
@@ -2403,7 +2502,7 @@ function SwatUI:CreateWindow(title, size)
                     if bg == oldDark then d.BackgroundColor3 = dark end
                     if bg == oldHover then d.BackgroundColor3 = hover end
                 end
-                if d:IsA("TextLabel") or d:IsA("TextButton") then
+                if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
                     if d.TextColor3 == oldAccent then d.TextColor3 = base end
                     if d.TextColor3 == oldDark then d.TextColor3 = dark end
                     if d.TextColor3 == oldHover then d.TextColor3 = hover end
@@ -2411,6 +2510,7 @@ function SwatUI:CreateWindow(title, size)
                 if d:IsA("ImageLabel") or d:IsA("ImageButton") then
                     if d.ImageColor3 == oldAccent then d.ImageColor3 = base end
                     if d.ImageColor3 == oldDark then d.ImageColor3 = dark end
+                    if d.ImageColor3 == oldHover then d.ImageColor3 = hover end
                 end
                 local st = d:FindFirstChildOfClass("UIStroke")
                 if st then
@@ -2420,9 +2520,10 @@ function SwatUI:CreateWindow(title, size)
                 end
                 local grad = d:FindFirstChildOfClass("UIGradient")
                 if grad then
-                    local k0 = grad.Color.Keypoints[1].Value
-                    local k1 = grad.Color.Keypoints[#grad.Color.Keypoints].Value
-                    if k0 == oldDark or k1 == oldAccent then
+                    local kps = grad.Color.Keypoints
+                    local k0, k1 = kps[1].Value, kps[#kps].Value
+                    if k0 == oldDark or k1 == oldAccent
+                        or k0 == oldAccent or k1 == oldDark then
                         grad.Color = ColorSequence.new(dark, base)
                     end
                 end
@@ -2449,14 +2550,12 @@ function SwatUI:CreateWindow(title, size)
             ElementActive = dark, StrokeLight = base, Success = base,
         })
 
+        -- ✅ Recolore TODOS os elementos (incluindo dropdowns e colorPickers)
         for _, el in ipairs(self.Registry.all) do
-            local t = el:GetType()
-            if t ~= "colorPickers" and t ~= "dropdowns" then
-                if el.Frame and el.Frame.Parent then
-                    recolorTree(el.Frame, oldAccent, oldDark, oldHover, base, dark, hover)
-                    if el.Render then pcall(el.Render) end
-                    if el.RefreshColor then pcall(el.RefreshColor) end
-                end
+            if el.Frame and el.Frame.Parent then
+                recolorTree(el.Frame, oldAccent, oldDark, oldHover, base, dark, hover)
+                if el.Render then pcall(el.Render) end
+                if el.RefreshColor then pcall(el.RefreshColor) end
             end
         end
 
@@ -2660,27 +2759,26 @@ function SwatUI:CreateWindow(title, size)
                 Position = UDim2.new(0.5, 0, 0.5, 0),
                 BackgroundTransparency = 1,
             })
-            task.delay(0.28, function()
+            task.delay(AnimTime(0.28), function()
                 main.Visible = false
                 miniBar.Visible = false
             end)
         else
             main.Visible = true
             main.Size = UDim2.new(0, 0, 0, 0)
-            main.Position = UDim2.new(0.5, 0, 0.5, 0)
+            main.Position = savedMainPos or self.OriginalPosition or UDim2.new(0.5, 0, 0.5, 0)
             main.BackgroundTransparency = 1
             local bgT = self.CurrentBgTransparency or 0
-            local t = TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            local t = TweenBack(main, 0.3, {
                 BackgroundTransparency = bgT,
                 Size = self.Size,
-                Position = self.OriginalPosition or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2),
             })
-            t:Play()
             t.Completed:Connect(function()
                 self:SetBackgroundTransparency((self.CurrentBgTransparency or 0) * 100)
             end)
         end
     end
+
     function self:SetToggleKey(keyName)
         self.ToggleKey = keyName
         saveData["ToggleKey"] = keyName
@@ -2702,7 +2800,7 @@ function SwatUI:CreateWindow(title, size)
     -- SETTINGS PANEL
     -- ============================================================
     local PANEL_WIDTH = 250
-    local PANEL_HEIGHT = 420
+    local PANEL_HEIGHT = 460
     local panelRefs = {}
 
     local settingsPanel = Create("Frame", {
@@ -2919,7 +3017,7 @@ function SwatUI:CreateWindow(title, size)
             arrow.Text = "▼"
             Tween(listFrame, 0.18, { Size = UDim2.new(1, -20, 0, 0) })
             Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 54) })
-            task.delay(0.19, function() listFrame.Visible = false end)
+            task.delay(AnimTime(0.19), function() listFrame.Visible = false end)
         end
         local function openList()
             if isOpen then return end
@@ -2928,12 +3026,8 @@ function SwatUI:CreateWindow(title, size)
             listFrame.Visible = true
             local contentH = #options * 24 + 8
             local finalH = math.min(contentH, 170)
-            TweenService:Create(listFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, -20, 0, finalH)
-            }):Play()
-            TweenService:Create(row, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, 0, 0, 54 + finalH + 6)
-            }):Play()
+            TweenBack(listFrame, 0.3, { Size = UDim2.new(1, -20, 0, finalH) })
+            TweenBack(row, 0.3, { Size = UDim2.new(1, 0, 0, 54 + finalH + 6) })
         end
 
         for i, opt in ipairs(options) do
@@ -3063,7 +3157,7 @@ function SwatUI:CreateWindow(title, size)
             Tween(settingsPanel, 0.22, { Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT) })
         else
             Tween(settingsPanel, 0.18, { Size = UDim2.new(0, PANEL_WIDTH, 0, 0) })
-            task.delay(0.19, function() settingsPanel.Visible = false end)
+            task.delay(AnimTime(0.19), function() settingsPanel.Visible = false end)
         end
     end
     gearBtn.MouseButton1Click:Connect(function() toggleSettings() end)
@@ -3102,10 +3196,20 @@ function SwatUI:CreateWindow(title, size)
     end, 0.05)
     self.ToggleSpeed = saveData["ToggleSpeed"] or 0.2
 
+    -- ✅ SLIDER DE ANIMAÇÃO GLOBAL (afeta TUDO)
+    panelSlider("Global Animation Speed", 0.25, 3.0, saveData["AnimSpeed"] or 1.0, function(v)
+        self:SetAnimationSpeed(v)
+    end, 0.05)
+
     panelKeybindPicker("Menu Toggle Key", saveData["ToggleKey"] or "K", function(keyName)
         self:SetToggleKey(keyName)
         self:Notify({ Title = "Toggle Key", Description = "Set to: " .. keyName, Duration = 2, Type = "success" })
     end)
+
+    -- ✅ Dropdown para escolher modo de minimize
+    panelDropdown("Minimize Mode", {"Mini", "Large"},
+        saveData["MinimizeMode"] or "Mini",
+        function(mode) self:SetMinimizeMode(mode) end)
 
     panelDropdown("Font Family", fontNames, saveData["SelectedFont"] or "Gotham", function(fontName)
         for _, fontEnum in ipairs(Enum.Font:GetEnumItems()) do
@@ -3287,6 +3391,8 @@ function SwatUI:CreateWindow(title, size)
             self.CurrentAccentColor = Theme.Accent
             self.CurrentAccentDark = Theme.AccentDark
             self.CurrentAccentHover = Theme.AccentHover
+            self.AnimSpeed = 1.0
+            AnimSpeed = 1.0
 
             for _, ref in ipairs(panelRefs) do
                 if ref.api and ref.api.SetValue then
@@ -3389,7 +3495,7 @@ function SwatUI:CreateWindow(title, size)
     end
 
     -- ============================================================
-    -- CREATE TAB (com efeito de segurar)
+    -- CREATE TAB
     -- ============================================================
     function self:CreateTab(name, iconName)
         local tabButton = Create("TextButton", {
@@ -3622,17 +3728,17 @@ function SwatUI:CreateWindow(title, size)
         })
         descLbl.Parent = notif
 
-        TweenService:Create(notif, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TweenBack(notif, 0.35, {
             Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0,
-        }):Play()
+        })
         Tween(titleLbl, 0.3, { TextTransparency = 0 })
         Tween(descLbl, 0.3, { TextTransparency = 0 })
 
         task.delay(duration, function()
             if not (notif and notif.Parent) then return end
-            local exitTween = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Position = UDim2.new(0, 60, 0, 0), BackgroundTransparency = 1,
-            })
+            local exitTween = TweenService:Create(notif,
+                TweenInfo.new(AnimTime(0.3), Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { Position = UDim2.new(0, 60, 0, 0), BackgroundTransparency = 1 })
             exitTween:Play()
             Tween(titleLbl, 0.3, { TextTransparency = 1 })
             Tween(descLbl, 0.3, { TextTransparency = 1 })
@@ -3750,7 +3856,7 @@ function SwatUI:_ExtendTab(tab)
         btn.MouseButton1Click:Connect(function()
             local s = frame.Size
             Tween(frame, 0.08, { Size = UDim2.new(1, -4, 0, s.Y.Offset - 2) })
-            task.delay(0.1, function() Tween(frame, 0.08, { Size = s }) end)
+            task.delay(AnimTime(0.1), function() Tween(frame, 0.08, { Size = s }) end)
             setStatus(Status.ON)
             task.delay(0.6, function() setStatus(Status.ACTIVE) end)
             if cfg.Callback then task.spawn(cfg.Callback) end
@@ -4184,7 +4290,20 @@ function SwatUI:_ExtendTab(tab)
             currentHue, currentSat, currentVal = c:ToHSV()
             updateUI()
             setStatus(Status.ON)
-            if themeKey then window:SetTheme({ [themeKey] = c }) end
+            if themeKey then
+                window:SetTheme({ [themeKey] = c })
+                local oldAccent = window.CurrentAccentColor or Theme.Accent
+                local oldDark = window.CurrentAccentDark or Theme.AccentDark
+                local oldHover = window.CurrentAccentHover or Theme.AccentHover
+                window.CurrentAccentColor = c
+                window.CurrentAccentDark = c:Lerp(Color3.new(0,0,0), 0.65)
+                window.CurrentAccentHover = c:Lerp(Color3.new(1,1,1), 0.22)
+                for _, el in ipairs(window.Registry.all) do
+                    if el.Frame and el.Frame.Parent then
+                        if el.RefreshColor then pcall(el.RefreshColor) end
+                    end
+                end
+            end
             if fireCallback and callback then task.spawn(callback, c) end
         end
 
@@ -4244,12 +4363,8 @@ function SwatUI:_ExtendTab(tab)
             if isOpen then return end
             isOpen = true; setStatus(Status.ON)
             local wanted = math.min(CONTENT_HEIGHT, MAX_HEIGHT - BASE_HEIGHT)
-            TweenService:Create(contentHolder, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, -14, 0, wanted)
-            }):Play()
-            TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, 0, 0, BASE_HEIGHT + wanted + 6)
-            }):Play()
+            TweenBack(contentHolder, 0.3, { Size = UDim2.new(1, -14, 0, wanted) })
+            TweenBack(frame, 0.3, { Size = UDim2.new(1, 0, 0, BASE_HEIGHT + wanted + 6) })
         end
         local function closePicker()
             if not isOpen then return end
@@ -4413,15 +4528,11 @@ function SwatUI:_ExtendTab(tab)
             iconLabel.Visible = false; closeIcon.Visible = true
             setStatus(Status.ON)
             task.defer(function()
-                task.wait(0.03)
+                task.wait(AnimTime(0.03))
                 local wanted = getWantedListHeight()
                 listHolder.Size = UDim2.new(1, -14, 0, 0)
-                TweenService:Create(listHolder, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                    Size = UDim2.new(1, -14, 0, wanted)
-                }):Play()
-                TweenService:Create(frame, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                    Size = UDim2.new(1, 0, 0, BASE_HEIGHT + wanted + 6)
-                }):Play()
+                TweenBack(listHolder, 0.32, { Size = UDim2.new(1, -14, 0, wanted) })
+                TweenBack(frame, 0.32, { Size = UDim2.new(1, 0, 0, BASE_HEIGHT + wanted + 6) })
             end)
         end
 
@@ -4703,12 +4814,12 @@ function SwatUI:_ExtendTab(tab)
     function tab:CreateThemePreset(cfg)
         cfg = cfg or {}
         local presets = cfg.Presets or {
-            { Name = "Blue",   Colors = { Accent = Color3.fromRGB(96,176,255),  AccentHover = Color3.fromRGB(140,200,255), AccentDark = Color3.fromRGB(44,100,178)  } },
-            { Name = "Red",    Colors = { Accent = Color3.fromRGB(255,100,100), AccentHover = Color3.fromRGB(255,140,140), AccentDark = Color3.fromRGB(160,40,40)   } },
-            { Name = "Green",  Colors = { Accent = Color3.fromRGB(88,220,140),  AccentHover = Color3.fromRGB(120,240,170), AccentDark = Color3.fromRGB(40,130,80)   } },
-            { Name = "Purple", Colors = { Accent = Color3.fromRGB(196,110,255), AccentHover = Color3.fromRGB(214,150,255), AccentDark = Color3.fromRGB(100,50,160)  } },
-            { Name = "Orange", Colors = { Accent = Color3.fromRGB(255,160,60),  AccentHover = Color3.fromRGB(255,190,110), AccentDark = Color3.fromRGB(160,90,30)   } },
-            { Name = "Pink",   Colors = { Accent = Color3.fromRGB(255,120,190), AccentHover = Color3.fromRGB(255,160,215), AccentDark = Color3.fromRGB(160,50,110)  } },
+            { Name = "Blue",   Colors = { Accent = Color3.fromRGB(130,190,255), AccentHover = Color3.fromRGB(180,220,255), AccentDark = Color3.fromRGB(60,110,200) } },
+            { Name = "Red",    Colors = { Accent = Color3.fromRGB(255,110,120), AccentHover = Color3.fromRGB(255,160,165), AccentDark = Color3.fromRGB(160,40,50)   } },
+            { Name = "Green",  Colors = { Accent = Color3.fromRGB(100,240,160), AccentHover = Color3.fromRGB(140,255,190), AccentDark = Color3.fromRGB(40,130,80)   } },
+            { Name = "Purple", Colors = { Accent = Color3.fromRGB(210,130,255), AccentHover = Color3.fromRGB(230,170,255), AccentDark = Color3.fromRGB(100,50,160)  } },
+            { Name = "Orange", Colors = { Accent = Color3.fromRGB(255,170,80),  AccentHover = Color3.fromRGB(255,200,130), AccentDark = Color3.fromRGB(160,90,30)   } },
+            { Name = "Pink",   Colors = { Accent = Color3.fromRGB(255,130,200), AccentHover = Color3.fromRGB(255,170,220), AccentDark = Color3.fromRGB(160,50,110)  } },
         }
 
         local frame = Create("Frame", {
@@ -4756,4 +4867,3 @@ function SwatUI:_ExtendTab(tab)
 end
 
 return SwatUI
-
