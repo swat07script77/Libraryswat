@@ -1,9 +1,9 @@
 --[[
-    SwatUI Library v15 (FINAL - Bug Fixes)
-    - 2 Toggles separados: "Small Minimize" e "Large Minimize" (substituem dropdown)
-    - Bug de animação lenta corrigido (clamp em AnimTime)
-    - Color picker/theme agora atualiza TODOS os elementos incluindo painel de settings
-    - Slider de animação global unificado
+    SwatUI Library v16 (FINAL - Bug Fixes Aplicados)
+    - SavePositiveMini / SavePositiveGrande funcionando
+    - Large Minimize sem bug (só esconde container)
+    - Color picker atualiza TODOS os elementos
+    - Animation Speed global
     - SEM ícones (você adiciona via SetIcons)
 ]]
 
@@ -16,6 +16,7 @@ local TweenService     = game:GetService("TweenService")
 local HttpService      = game:GetService("HttpService")
 local LocalPlayer      = Players.LocalPlayer
 
+-- ============================================================
 -- ============================================================
 local LibraryIcons = {
     ["a-arrow-down"] = 92867583610071,
@@ -1704,12 +1705,10 @@ for k, v in pairs(DefaultTheme) do Theme[k] = v end
 local DefaultThemeCopy = {}
 for k, v in pairs(DefaultTheme) do DefaultThemeCopy[k] = v end
 
--- ✅ FIX: AnimTime com clamp mínimo para evitar animações infinitamente lentas
 local AnimSpeed = 1.0
 local function AnimTime(base)
     base = base or 0.2
     local result = base / math.max(AnimSpeed, 0.05)
-    -- ✅ garante tempo MÍNIMO de 0.05s para callbacks funcionarem
     return math.max(result, 0.05)
 end
 
@@ -1947,7 +1946,6 @@ function SwatUI:CreateWindow(title, size)
         fontPickers = {}, themePresets = {}, colorPickers = {}, all = {},
     }
 
-    -- ✅ Registro de painéis de settings (para recolor global)
     self._settingsRowRefs = {}
 
     local isTouch = IsTouchDevice()
@@ -2167,38 +2165,62 @@ function SwatUI:CreateWindow(title, size)
         end)
     end
 
+    -- ============ POSIÇÕES REAIS SALVAS ============
     local savedMainPos = nil
+    local savedMiniPos = nil
+    local isMinimizingOrRestoring = false
 
-    -- ✅ FIX: usar spawn + task.wait para o completed (mais seguro contra AnimSpeed muito baixo)
+    function self:SavePositiveMini()
+        if not miniBar or not miniBar.Parent then return end
+        savedMiniPos = miniBar.Position
+        saveData["SavedMiniPos"] = {
+            XS = savedMiniPos.X.Scale,
+            XO = savedMiniPos.X.Offset,
+            YS = savedMiniPos.Y.Scale,
+            YO = savedMiniPos.Y.Offset,
+        }
+        persist()
+    end
+
+    function self:SavePositiveGrande()
+        if not main or not main.Parent then return end
+        savedMainPos = main.Position
+        self.OriginalPosition = savedMainPos
+        saveData["SavedMainPos"] = {
+            XS = savedMainPos.X.Scale,
+            XO = savedMainPos.X.Offset,
+            YS = savedMainPos.Y.Scale,
+            YO = savedMainPos.Y.Offset,
+        }
+        persist()
+    end
+
     local function restoreWindow()
         if not self.IsMinimized then return end
         self.IsMinimized = false
+        isMinimizingOrRestoring = true
 
         if self.MinimizeMode == "Large" then
             container.Visible = true
             miniBar.Visible = false
-            TweenBack(main, 0.32, {
-                Size = self.Size,
-                Position = savedMainPos or self.OriginalPosition or
-                    UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2),
-            })
+            main.Visible = true
+            main.BackgroundColor3 = Theme.Background
         else
             Tween(miniBar, 0.28, {
                 Size = UDim2.new(0, 0, 0, 44),
-                Position = UDim2.new(0.5, 0, 0, 10),
                 BackgroundTransparency = 1,
             })
-            -- ✅ FIX: usa task.spawn + wait em vez de delay (mais confiável)
             task.spawn(function()
                 task.wait(AnimTime(0.3))
                 miniBar.Visible = false
                 miniBar.Size = UDim2.new(0, 0, 0, 44)
-                miniBar.Position = UDim2.new(0.5, 0, 0, 10)
                 miniBar.BackgroundTransparency = 0.05
             end)
             main.Visible = true
             main.Size = UDim2.new(0, 0, 0, 0)
-            main.Position = savedMainPos or self.OriginalPosition or UDim2.new(0.5, 0, 0.5, 0)
+            main.Position = savedMainPos
+                or self.OriginalPosition
+                or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2)
             main.BackgroundTransparency = 1
             local bgT = self.CurrentBgTransparency or 0
             local tween = TweenBack(main, 0.35, {
@@ -2210,6 +2232,9 @@ function SwatUI:CreateWindow(title, size)
             end)
         end
         container.Visible = true
+        task.delay(AnimTime(0.5), function()
+            isMinimizingOrRestoring = false
+        end)
     end
     centerBtn.MouseButton1Click:Connect(restoreWindow)
 
@@ -2230,17 +2255,27 @@ function SwatUI:CreateWindow(title, size)
     end)
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then draggingMini = false end
+            or input.UserInputType == Enum.UserInputType.Touch then
+            if draggingMini then
+                draggingMini = false
+                self:SavePositiveMini()
+            end
+        end
     end)
 
-    -- ✅ FIX: minimizar com task.wait garante que miniBar feche mesmo em anim lenta
+    main:GetPropertyChangedSignal("Position"):Connect(function()
+        if not self.IsMinimized and not isMinimizingOrRestoring then
+            self:SavePositiveGrande()
+        end
+    end)
+
     local function minimizeWindow(mode)
         if self.IsMinimized then return end
         self.IsMinimized = true
+        isMinimizingOrRestoring = true
         mode = mode or self.MinimizeMode or "Mini"
 
-        savedMainPos = main.Position
-        if not self.OriginalPosition then self.OriginalPosition = savedMainPos end
+        self:SavePositiveGrande()
 
         if mode == "Mini" then
             local hideMain = TweenService:Create(main,
@@ -2251,13 +2286,15 @@ function SwatUI:CreateWindow(title, size)
             hideMain.Completed:Connect(function()
                 main.Visible = false
             end)
-            -- ✅ FIX: animação da mini bar em thread separada (não depende do completed)
+            local targetMiniPos = savedMiniPos
+                or savedMainPos
+                or UDim2.new(0.5, -(isTouch and 240 or 260)/2, 0, 10)
             task.spawn(function()
                 task.wait(AnimTime(0.3))
                 if not self.IsMinimized then return end
                 local barWidth = isTouch and 240 or 260
                 miniBar.Size = UDim2.new(0, 0, 0, 44)
-                miniBar.Position = savedMainPos
+                miniBar.Position = targetMiniPos
                 miniBar.BackgroundTransparency = 1
                 miniBar.Visible = true
                 TweenBack(miniBar, 0.32, {
@@ -2270,199 +2307,44 @@ function SwatUI:CreateWindow(title, size)
             miniBar.Visible = false
             container.Visible = false
             main.Visible = true
-            Tween(main, 0.28, {
-                Size = UDim2.new(0, isTouch and 260 or 300, 0, 120),
-                BackgroundColor3 = Theme.Panel,
-            })
         end
+
+        task.delay(AnimTime(0.5), function()
+            isMinimizingOrRestoring = false
+        end)
     end
     minBtn.MouseButton1Click:Connect(function()
         if self.IsMinimized then restoreWindow() else minimizeWindow(self.MinimizeMode or "Mini") end
     end)
 
-    -- ✅ POSIÇÕES REAIS SALVAS
-local savedMainPos = nil
-local savedMiniPos = nil
+    self.RestoreWindow = restoreWindow
+    self.MinimizeWindow = minimizeWindow
 
--- ============================================================
--- SavePositiveMini
--- Salva a posição REAL da mini bar
--- ============================================================
-function self:SavePositiveMini()
-    if not miniBar or not miniBar.Parent then return end
-    savedMiniPos = miniBar.Position
-    saveData["SavedMiniPos"] = {
-        XS = savedMiniPos.X.Scale,
-        XO = savedMiniPos.X.Offset,
-        YS = savedMiniPos.Y.Scale,
-        YO = savedMiniPos.Y.Offset,
-    }
-    persist()
-end
-
--- ============================================================
--- SavePositiveGrande
--- Salva a posição REAL do menu grande (main)
--- ============================================================
-function self:SavePositiveGrande()
-    if not main or not main.Parent then return end
-    savedMainPos = main.Position
-    self.OriginalPosition = savedMainPos
-    saveData["SavedMainPos"] = {
-        XS = savedMainPos.X.Scale,
-        XO = savedMainPos.X.Offset,
-        YS = savedMainPos.Y.Scale,
-        YO = savedMainPos.Y.Offset,
-    }
-    persist()
-end
-
--- Restaura posições salvas do arquivo
-if saveData["SavedMainPos"] then
-    local p = saveData["SavedMainPos"]
-    savedMainPos = UDim2.new(p.XS, p.XO, p.YS, p.YO)
-    self.OriginalPosition = savedMainPos
-end
-if saveData["SavedMiniPos"] then
-    local p = saveData["SavedMiniPos"]
-    savedMiniPos = UDim2.new(p.XS, p.XO, p.YS, p.YO)
-end
-
-local function restoreWindow()
-    if not self.IsMinimized then return end
-    self.IsMinimized = false
-
-    if self.MinimizeMode == "Large" then
-        container.Visible = true
-        miniBar.Visible = false
-        main.Visible = true
-        main.BackgroundColor3 = Theme.Background
-    else
-        Tween(miniBar, 0.28, {
-            Size = UDim2.new(0, 0, 0, 44),
-            BackgroundTransparency = 1,
-        })
-        task.spawn(function()
-            task.wait(AnimTime(0.3))
-            miniBar.Visible = false
-            miniBar.Size = UDim2.new(0, 0, 0, 44)
-            miniBar.BackgroundTransparency = 0.05
-        end)
-        main.Visible = true
-        main.Size = UDim2.new(0, 0, 0, 0)
-        main.Position = savedMainPos
-            or self.OriginalPosition
-            or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2)
-        main.BackgroundTransparency = 1
-        local bgT = self.CurrentBgTransparency or 0
-        local tween = TweenBack(main, 0.35, {
-            BackgroundTransparency = bgT,
-            Size = self.Size,
-        })
-        tween.Completed:Connect(function()
-            self:SetBackgroundTransparency((self.CurrentBgTransparency or 0) * 100)
-        end)
-    end
-    container.Visible = true
-end
-centerBtn.MouseButton1Click:Connect(restoreWindow)
-
-local draggingMini, dragStartPos, startMouse = false, nil, nil
-dragArea.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-        draggingMini = true; dragStartPos = miniBar.Position; startMouse = input.Position
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if draggingMini and (input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - startMouse
-        miniBar.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X,
-                                      dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingMini then
-            draggingMini = false
-            self:SavePositiveMini()
-        end
-    end
-end)
-
-local isMinimizingOrRestoring = false
-main:GetPropertyChangedSignal("Position"):Connect(function()
-    if not self.IsMinimized and not isMinimizingOrRestoring then
-        self:SavePositiveGrande()
-    end
-end)
-
-local function minimizeWindow(mode)
-    if self.IsMinimized then return end
-    self.IsMinimized = true
-    isMinimizingOrRestoring = true
-    mode = mode or self.MinimizeMode or "Mini"
-
-    self:SavePositiveGrande()
-
-    if mode == "Mini" then
-        local hideMain = TweenService:Create(main,
-            TweenInfo.new(AnimTime(0.3), Enum.EasingStyle.Sine),
-            { BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0),
-              Position = UDim2.new(0.5, 0, 0.5, 0) })
-        hideMain:Play()
-        hideMain.Completed:Connect(function()
-            main.Visible = false
-        end)
-        local targetMiniPos = savedMiniPos
-            or savedMainPos
-            or UDim2.new(0.5, -(isTouch and 240 or 260)/2, 0, 10)
-        task.spawn(function()
-            task.wait(AnimTime(0.3))
-            if not self.IsMinimized then return end
-            local barWidth = isTouch and 240 or 260
-            miniBar.Size = UDim2.new(0, 0, 0, 44)
-            miniBar.Position = targetMiniPos
-            miniBar.BackgroundTransparency = 1
-            miniBar.Visible = true
-            TweenBack(miniBar, 0.32, {
-                Size = UDim2.new(0, barWidth, 0, 44),
-                BackgroundTransparency = 0.05,
-            })
-            startClock()
-        end)
-    else
-        miniBar.Visible = false
-        container.Visible = false
-        main.Visible = true
-    end
-
-    task.delay(AnimTime(0.5), function()
-        isMinimizingOrRestoring = false
-    end)
-end
-minBtn.MouseButton1Click:Connect(function()
-    if self.IsMinimized then restoreWindow() else minimizeWindow(self.MinimizeMode or "Mini") end
-end)
-
-self.RestoreWindow = restoreWindow
-self.MinimizeWindow = minimizeWindow
     function self:SetMinimizeMode(mode)
         mode = (mode == "Large") and "Large" or "Mini"
         self.MinimizeMode = mode
+        saveData["MinimizeMode"] = mode
+        persist()
 
         if not self.IsMinimized then return end
 
         if mode == "Mini" then
+            container.Visible = true
+            main.Visible = false
             miniBar.Visible = true
+            local targetMiniPos = savedMiniPos
+                or savedMainPos
+                or UDim2.new(0.5, -(isTouch and 240 or 260)/2, 0, 10)
+            miniBar.Position = targetMiniPos
             miniBar.Size = UDim2.new(0, isTouch and 240 or 260, 0, 44)
         else
             miniBar.Visible = false
             container.Visible = false
             main.Visible = true
-            main.Size = UDim2.new(0, isTouch and 260 or 300, 0, 120)
+            main.Size = self.Size
+            main.Position = savedMainPos
+                or self.OriginalPosition
+                or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2)
         end
     end
 
@@ -2610,6 +2492,18 @@ self.MinimizeWindow = minimizeWindow
         return pcall(writefile, SAVE_FILE, encoded)
     end
 
+    -- Restaura posições salvas
+    if saveData["SavedMainPos"] then
+        local p = saveData["SavedMainPos"]
+        savedMainPos = UDim2.new(p.XS, p.XO, p.YS, p.YO)
+        self.OriginalPosition = savedMainPos
+        main.Position = savedMainPos
+    end
+    if saveData["SavedMiniPos"] then
+        local p = saveData["SavedMiniPos"]
+        savedMiniPos = UDim2.new(p.XS, p.XO, p.YS, p.YO)
+    end
+
     if saveData["MinimizeMode"] then
         self.MinimizeMode = saveData["MinimizeMode"]
     end
@@ -2724,7 +2618,6 @@ self.MinimizeWindow = minimizeWindow
             end
         end
 
-        -- ✅ FIX: também recolore todos os painéis de settings (rows registrados)
         for _, ref in ipairs(self._settingsRowRefs) do
             if ref.row and ref.row.Parent then
                 recolorTree(ref.row, oldAccent, oldDark, oldHover, base, dark, hover)
@@ -3019,7 +2912,6 @@ self.MinimizeWindow = minimizeWindow
     local settingsOrder = 0
     local function nextSO() settingsOrder = settingsOrder + 1; return settingsOrder end
 
-    -- ✅ FIX: registra row + render para recolor global funcionar
     local function registerSettingsRow(row, render, refresh)
         table.insert(self._settingsRowRefs, { row = row, render = render, refresh = refresh })
     end
@@ -3130,10 +3022,8 @@ self.MinimizeWindow = minimizeWindow
             apply(min + (max - min) * rel, true)
         end
         TrackDrag(click, function(input) fromX(input.Position.X) end)
-        -- ✅ FIX: refresh das cores
         local function refresh()
             local col = self.CurrentAccentColor or Theme.Accent
-            local dark = self.CurrentAccentDark or Theme.AccentDark
             valLbl.TextColor3 = col
             fill.BackgroundColor3 = col
             if knobStroke then knobStroke.Color = col end
@@ -3221,7 +3111,6 @@ self.MinimizeWindow = minimizeWindow
                 end
             end)
         end)
-        -- ✅ FIX: refresh
         local function refresh()
             keyBtn.TextColor3 = self.CurrentAccentColor or Theme.Accent
             if keyBtnStroke then keyBtnStroke.Color = self.CurrentAccentDark or Theme.AccentDark end
@@ -3283,7 +3172,6 @@ self.MinimizeWindow = minimizeWindow
         self:SetFontScale(v)
     end, 0.05)
 
-    -- ✅ APENAS UM slider de animação (o global)
     panelSlider("Animation Speed", 0.25, 3.0, saveData["AnimSpeed"] or 1.0, function(v)
         self:SetAnimationSpeed(v)
     end, 0.05)
@@ -3293,7 +3181,7 @@ self.MinimizeWindow = minimizeWindow
         self:Notify({ Title = "Toggle Key", Description = "Set to: " .. keyName, Duration = 2, Type = "success" })
     end)
 
-    -- ✅ FIX: 2 Toggles separados em vez de dropdown
+    -- 2 Toggles separados
     panelToggle("Small Minimize", (saveData["MinimizeMode"] or "Mini") == "Mini", function(state)
         if state then
             self:SetMinimizeMode("Mini")
@@ -3309,12 +3197,10 @@ self.MinimizeWindow = minimizeWindow
         end
     end)
 
-    -- ✅ FIX: Removido "Toggle Anim Speed" antigo (unificado em Animation Speed)
     self.ToggleSpeed = saveData["ToggleSpeed"] or 0.2
 
-    -- ✅ FIX: dropdown de fonte
-    local fontDropdown
-    fontDropdown = (function()
+    -- Dropdown de fonte
+    do
         local row = Create("Frame", {
             Size = UDim2.new(1, 0, 0, 54),
             BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
@@ -3408,14 +3294,12 @@ self.MinimizeWindow = minimizeWindow
         mainBtn.MouseButton1Click:Connect(function()
             if isOpen then closeList() else openList() end
         end)
-        -- ✅ refresh
         local function refresh()
             arrow.TextColor3 = self.CurrentAccentColor or Theme.Accent
         end
         registerSettingsRow(row, nil, refresh)
-        return { SetValue = function(v) selected = v; btnText.Text = v end, GetValue = function() return selected end }
-    end)()
-    table.insert(panelRefs, { api = fontDropdown, default = "Gotham" })
+        table.insert(panelRefs, { api = { SetValue = function(v) selected = v; btnText.Text = v end, GetValue = function() return selected end }, default = "Gotham" })
+    end
 
     local notifyEnabled = saveData["NotifyEnabled"]
     if notifyEnabled == nil then notifyEnabled = true end
@@ -3569,8 +3453,7 @@ self.MinimizeWindow = minimizeWindow
     panelToggle("Bottom Drag Bar", dragBarActive, setDragBar)
     if dragBarActive then task.delay(0.4, function() setDragBar(true) end) end
 
-    -- ✅ Theme Color dropdown (com refresh)
-    local themeDropdown
+    -- Theme Color dropdown
     do
         local row = Create("Frame", {
             Size = UDim2.new(1, 0, 0, 54),
@@ -3663,8 +3546,7 @@ self.MinimizeWindow = minimizeWindow
             arrow.TextColor3 = self.CurrentAccentColor or Theme.Accent
         end
         registerSettingsRow(row, nil, refresh)
-        themeDropdown = { SetValue = function(v) selected = v; btnText.Text = v end, GetValue = function() return selected end }
-        table.insert(panelRefs, { api = themeDropdown, default = "Blue" })
+        table.insert(panelRefs, { api = { SetValue = function(v) selected = v; btnText.Text = v end, GetValue = function() return selected end }, default = "Blue" })
     end
 
     if saveData["ThemeColor"] and ColorThemes[saveData["ThemeColor"]] then
