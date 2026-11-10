@@ -1,15 +1,10 @@
 --[[
-    SwatUI Library v14 (FINAL - Enhanced)
-    - Menu SEMPRE por cima de TUDO (CoreGui + DisplayOrder máximo) ✅
-    - Cor mais chamativa sem exagero ✅
-    - Efeito "segurar aba" (destaca e volta) ✅
-    - Color Picker / Dropdown estáveis ✅
-    - + Animação GLOBAL (afeta tudo) ✅
-    - + 2 modos de minimize: SetMinimizeMode("Mini"/"Large") ✅
-    - Ambos mantém a POSIÇÃO REAL do usuário ✅
-    - + Color picker recolore UI inteira em tempo real ✅
-    - + Visual mais vivo ✅
-    - SEM ícones (você adiciona via SetIcons) ✅
+    SwatUI Library v15 (FINAL - Bug Fixes)
+    - 2 Toggles separados: "Small Minimize" e "Large Minimize" (substituem dropdown)
+    - Bug de animação lenta corrigido (clamp em AnimTime)
+    - Color picker/theme agora atualiza TODOS os elementos incluindo painel de settings
+    - Slider de animação global unificado
+    - SEM ícones (você adiciona via SetIcons)
 ]]
 
 local SwatUI = {}
@@ -21,6 +16,7 @@ local TweenService     = game:GetService("TweenService")
 local HttpService      = game:GetService("HttpService")
 local LocalPlayer      = Players.LocalPlayer
 
+-- ============================================================
 local LibraryIcons = {
     ["a-arrow-down"] = 92867583610071,
     ["a-arrow-up"] = 132318504999733,
@@ -1669,6 +1665,7 @@ local LibraryIcons = {
     ["zoom-out"] = 108334162607319
 }
 
+
 function SwatUI:SetIcons(tbl)
     if type(tbl) == "table" then
         for k, v in pairs(tbl) do LibraryIcons[k] = v end
@@ -1677,7 +1674,7 @@ end
 function SwatUI:GetIcons() return LibraryIcons end
 
 -- ============================================================
--- TEMA (cores mais vivas)
+-- TEMA
 -- ============================================================
 local DefaultTheme = {
     Background = Color3.fromRGB(10, 12, 18),
@@ -1707,10 +1704,13 @@ for k, v in pairs(DefaultTheme) do Theme[k] = v end
 local DefaultThemeCopy = {}
 for k, v in pairs(DefaultTheme) do DefaultThemeCopy[k] = v end
 
--- ✅ MULTIPLICADOR GLOBAL DE ANIMAÇÃO
+-- ✅ FIX: AnimTime com clamp mínimo para evitar animações infinitamente lentas
 local AnimSpeed = 1.0
 local function AnimTime(base)
-    return (base or 0.2) / math.max(AnimSpeed, 0.05)
+    base = base or 0.2
+    local result = base / math.max(AnimSpeed, 0.05)
+    -- ✅ garante tempo MÍNIMO de 0.05s para callbacks funcionarem
+    return math.max(result, 0.05)
 end
 
 local Status = { OFF = "off", ACTIVE = "active", ON = "on" }
@@ -1947,6 +1947,9 @@ function SwatUI:CreateWindow(title, size)
         fontPickers = {}, themePresets = {}, colorPickers = {}, all = {},
     }
 
+    -- ✅ Registro de painéis de settings (para recolor global)
+    self._settingsRowRefs = {}
+
     local isTouch = IsTouchDevice()
     local viewport = GetViewport()
     local defaultSize
@@ -2164,9 +2167,9 @@ function SwatUI:CreateWindow(title, size)
         end)
     end
 
-    -- ✅ POSIÇÃO REAL SALVA (sem fake)
     local savedMainPos = nil
 
+    -- ✅ FIX: usar spawn + task.wait para o completed (mais seguro contra AnimSpeed muito baixo)
     local function restoreWindow()
         if not self.IsMinimized then return end
         self.IsMinimized = false
@@ -2185,7 +2188,9 @@ function SwatUI:CreateWindow(title, size)
                 Position = UDim2.new(0.5, 0, 0, 10),
                 BackgroundTransparency = 1,
             })
-            task.delay(AnimTime(0.3), function()
+            -- ✅ FIX: usa task.spawn + wait em vez de delay (mais confiável)
+            task.spawn(function()
+                task.wait(AnimTime(0.3))
                 miniBar.Visible = false
                 miniBar.Size = UDim2.new(0, 0, 0, 44)
                 miniBar.Position = UDim2.new(0.5, 0, 0, 10)
@@ -2193,7 +2198,6 @@ function SwatUI:CreateWindow(title, size)
             end)
             main.Visible = true
             main.Size = UDim2.new(0, 0, 0, 0)
-            -- ✅ USA A POSIÇÃO REAL SALVA
             main.Position = savedMainPos or self.OriginalPosition or UDim2.new(0.5, 0, 0.5, 0)
             main.BackgroundTransparency = 1
             local bgT = self.CurrentBgTransparency or 0
@@ -2229,12 +2233,12 @@ function SwatUI:CreateWindow(title, size)
             or input.UserInputType == Enum.UserInputType.Touch then draggingMini = false end
     end)
 
+    -- ✅ FIX: minimizar com task.wait garante que miniBar feche mesmo em anim lenta
     local function minimizeWindow(mode)
         if self.IsMinimized then return end
         self.IsMinimized = true
         mode = mode or self.MinimizeMode or "Mini"
 
-        -- ✅ SALVA POSIÇÃO REAL DO MAIN
         savedMainPos = main.Position
         if not self.OriginalPosition then self.OriginalPosition = savedMainPos end
 
@@ -2246,8 +2250,12 @@ function SwatUI:CreateWindow(title, size)
             hideMain:Play()
             hideMain.Completed:Connect(function()
                 main.Visible = false
+            end)
+            -- ✅ FIX: animação da mini bar em thread separada (não depende do completed)
+            task.spawn(function()
+                task.wait(AnimTime(0.3))
+                if not self.IsMinimized then return end
                 local barWidth = isTouch and 240 or 260
-                -- ✅ USA A POSIÇÃO REAL SALVA
                 miniBar.Size = UDim2.new(0, 0, 0, 44)
                 miniBar.Position = savedMainPos
                 miniBar.BackgroundTransparency = 1
@@ -2259,7 +2267,6 @@ function SwatUI:CreateWindow(title, size)
                 startClock()
             end)
         else
-            -- Large: janela reduzida mantendo posição
             miniBar.Visible = false
             container.Visible = false
             main.Visible = true
@@ -2276,12 +2283,9 @@ function SwatUI:CreateWindow(title, size)
     self.RestoreWindow = restoreWindow
     self.MinimizeWindow = minimizeWindow
 
-    -- ✅ NOVA FUNÇÃO: SetMinimizeMode("Mini" | "Large")
     function self:SetMinimizeMode(mode)
         mode = (mode == "Large") and "Large" or "Mini"
         self.MinimizeMode = mode
-        saveData["MinimizeMode"] = mode
-        persist()
 
         if not self.IsMinimized then return end
 
@@ -2440,14 +2444,10 @@ function SwatUI:CreateWindow(title, size)
         return pcall(writefile, SAVE_FILE, encoded)
     end
 
-    -- ✅ Restaura MinimizeMode
     if saveData["MinimizeMode"] then
         self.MinimizeMode = saveData["MinimizeMode"]
     end
 
-    -- ============================================================
-    -- ANIMATION SPEED (global)
-    -- ============================================================
     self.AnimSpeed = saveData["AnimSpeed"] or 1.0
     AnimSpeed = self.AnimSpeed
 
@@ -2550,12 +2550,20 @@ function SwatUI:CreateWindow(title, size)
             ElementActive = dark, StrokeLight = base, Success = base,
         })
 
-        -- ✅ Recolore TODOS os elementos (incluindo dropdowns e colorPickers)
         for _, el in ipairs(self.Registry.all) do
             if el.Frame and el.Frame.Parent then
                 recolorTree(el.Frame, oldAccent, oldDark, oldHover, base, dark, hover)
                 if el.Render then pcall(el.Render) end
                 if el.RefreshColor then pcall(el.RefreshColor) end
+            end
+        end
+
+        -- ✅ FIX: também recolore todos os painéis de settings (rows registrados)
+        for _, ref in ipairs(self._settingsRowRefs) do
+            if ref.row and ref.row.Parent then
+                recolorTree(ref.row, oldAccent, oldDark, oldHover, base, dark, hover)
+                if ref.render then pcall(ref.render) end
+                if ref.refresh then pcall(ref.refresh) end
             end
         end
 
@@ -2759,7 +2767,8 @@ function SwatUI:CreateWindow(title, size)
                 Position = UDim2.new(0.5, 0, 0.5, 0),
                 BackgroundTransparency = 1,
             })
-            task.delay(AnimTime(0.28), function()
+            task.spawn(function()
+                task.wait(AnimTime(0.28))
                 main.Visible = false
                 miniBar.Visible = false
             end)
@@ -2844,6 +2853,11 @@ function SwatUI:CreateWindow(title, size)
     local settingsOrder = 0
     local function nextSO() settingsOrder = settingsOrder + 1; return settingsOrder end
 
+    -- ✅ FIX: registra row + render para recolor global funcionar
+    local function registerSettingsRow(row, render, refresh)
+        table.insert(self._settingsRowRefs, { row = row, render = render, refresh = refresh })
+    end
+
     local function panelToggle(title, default, onChange)
         local row = Create("Frame", {
             Size = UDim2.new(1, 0, 0, 34),
@@ -2886,6 +2900,7 @@ function SwatUI:CreateWindow(title, size)
             if onChange then task.spawn(onChange, state) end
         end)
         render()
+        registerSettingsRow(row, render, nil)
         local api = { SetValue = function(v) state = v; render() end, GetValue = function() return state end }
         table.insert(panelRefs, { api = api, default = default })
         return api
@@ -2929,6 +2944,7 @@ function SwatUI:CreateWindow(title, size)
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 2,
         }, { Corner(99), Stroke(self.CurrentAccentColor or Theme.Accent, 1.5) })
         knob.Parent = bar
+        local knobStroke = knob:FindFirstChildOfClass("UIStroke")
         local click = Create("TextButton", {
             Size = UDim2.new(1, 0, 0, 20), Position = UDim2.new(0, 0, 0, 20),
             BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 3,
@@ -2948,114 +2964,16 @@ function SwatUI:CreateWindow(title, size)
             apply(min + (max - min) * rel, true)
         end
         TrackDrag(click, function(input) fromX(input.Position.X) end)
+        -- ✅ FIX: refresh das cores
+        local function refresh()
+            local col = self.CurrentAccentColor or Theme.Accent
+            local dark = self.CurrentAccentDark or Theme.AccentDark
+            valLbl.TextColor3 = col
+            fill.BackgroundColor3 = col
+            if knobStroke then knobStroke.Color = col end
+        end
+        registerSettingsRow(row, nil, refresh)
         local api = { SetValue = function(v) apply(v, false) end, GetValue = function() return val end }
-        table.insert(panelRefs, { api = api, default = default })
-        return api
-    end
-
-    local function panelDropdown(title, options, default, onChange)
-        local row = Create("Frame", {
-            Size = UDim2.new(1, 0, 0, 54),
-            BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
-            LayoutOrder = nextSO(), ClipsDescendants = true,
-        }, { Corner(8), Stroke(Theme.Stroke, 1) })
-        row.Parent = settingsScroll
-
-        Create("TextLabel", {
-            Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 4),
-            BackgroundTransparency = 1, Text = title,
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
-            TextXAlignment = Enum.TextXAlignment.Left,
-        }).Parent = row
-
-        local mainBtn = Create("TextButton", {
-            Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 22),
-            BackgroundColor3 = Theme.Panel, BorderSizePixel = 0,
-            Text = "", AutoButtonColor = false,
-        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
-        mainBtn.Parent = row
-
-        local btnText = Create("TextLabel", {
-            Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 10, 0, 0),
-            BackgroundTransparency = 1, Text = default or options[1] or "--",
-            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
-            TextXAlignment = Enum.TextXAlignment.Left,
-        })
-        btnText.Parent = mainBtn
-
-        local arrow = Create("TextLabel", {
-            Size = UDim2.new(0, 24, 1, 0), Position = UDim2.new(1, -24, 0, 0),
-            BackgroundTransparency = 1, Text = "▼",
-            TextColor3 = self.CurrentAccentColor or Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 9,
-        })
-        arrow.Parent = mainBtn
-
-        local listFrame = Create("Frame", {
-            Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 52),
-            BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
-            Visible = false, ClipsDescendants = true, ZIndex = 15,
-        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
-        listFrame.Parent = row
-
-        local listScroll = Create("ScrollingFrame", {
-            Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0,
-            ScrollBarThickness = 4, ScrollBarImageColor3 = Theme.AccentDark,
-            CanvasSize = UDim2.new(0, 0, 0, 0),
-            AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            ScrollingDirection = Enum.ScrollingDirection.Y,
-            ElasticBehavior = Enum.ElasticBehavior.Never, ZIndex = 16,
-        })
-        listScroll.Parent = listFrame
-        Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) }).Parent = listScroll
-
-        local isOpen = false
-        local selected = default or options[1]
-
-        local function closeList()
-            if not isOpen then return end
-            isOpen = false
-            arrow.Text = "▼"
-            Tween(listFrame, 0.18, { Size = UDim2.new(1, -20, 0, 0) })
-            Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 54) })
-            task.delay(AnimTime(0.19), function() listFrame.Visible = false end)
-        end
-        local function openList()
-            if isOpen then return end
-            isOpen = true
-            arrow.Text = "▲"
-            listFrame.Visible = true
-            local contentH = #options * 24 + 8
-            local finalH = math.min(contentH, 170)
-            TweenBack(listFrame, 0.3, { Size = UDim2.new(1, -20, 0, finalH) })
-            TweenBack(row, 0.3, { Size = UDim2.new(1, 0, 0, 54 + finalH + 6) })
-        end
-
-        for i, opt in ipairs(options) do
-            local item = Create("TextButton", {
-                Size = UDim2.new(1, -6, 0, 22), BackgroundColor3 = Theme.Element,
-                BorderSizePixel = 0, Text = opt, TextColor3 = Theme.TextDim,
-                Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
-                LayoutOrder = i, ZIndex = 17,
-            }, { Corner(6) })
-            item.Parent = listScroll
-            item.MouseEnter:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.ElementHover }) end)
-            item.MouseLeave:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.Element }) end)
-            item.MouseButton1Click:Connect(function()
-                selected = opt; btnText.Text = opt
-                closeList()
-                if onChange then task.spawn(onChange, opt) end
-            end)
-        end
-
-        mainBtn.MouseButton1Click:Connect(function()
-            if isOpen then closeList() else openList() end
-        end)
-
-        local api = {
-            SetValue = function(v) selected = v; btnText.Text = v
-                if onChange then task.spawn(onChange, v) end end,
-            GetValue = function() return selected end,
-        }
         table.insert(panelRefs, { api = api, default = default })
         return api
     end
@@ -3099,6 +3017,7 @@ function SwatUI:CreateWindow(title, size)
             Font = Enum.Font.GothamBold, TextSize = 10, AutoButtonColor = false,
         }, { Corner(8), Stroke(self.CurrentAccentDark or Theme.AccentDark, 1.5) })
         keyBtn.Parent = row
+        local keyBtnStroke = keyBtn:FindFirstChildOfClass("UIStroke")
         local listening = false
         keyBtn.MouseButton1Click:Connect(function()
             if listening then return end
@@ -3136,6 +3055,12 @@ function SwatUI:CreateWindow(title, size)
                 end
             end)
         end)
+        -- ✅ FIX: refresh
+        local function refresh()
+            keyBtn.TextColor3 = self.CurrentAccentColor or Theme.Accent
+            if keyBtnStroke then keyBtnStroke.Color = self.CurrentAccentDark or Theme.AccentDark end
+        end
+        registerSettingsRow(row, nil, refresh)
         local api = {
             SetValue = function(v) keyBtn.Text = v end,
             GetValue = function() return keyBtn.Text end,
@@ -3157,7 +3082,10 @@ function SwatUI:CreateWindow(title, size)
             Tween(settingsPanel, 0.22, { Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT) })
         else
             Tween(settingsPanel, 0.18, { Size = UDim2.new(0, PANEL_WIDTH, 0, 0) })
-            task.delay(AnimTime(0.19), function() settingsPanel.Visible = false end)
+            task.spawn(function()
+                task.wait(AnimTime(0.19))
+                settingsPanel.Visible = false
+            end)
         end
     end
     gearBtn.MouseButton1Click:Connect(function() toggleSettings() end)
@@ -3189,15 +3117,8 @@ function SwatUI:CreateWindow(title, size)
         self:SetFontScale(v)
     end, 0.05)
 
-    panelSlider("Toggle Anim Speed", 0.05, 0.6, saveData["ToggleSpeed"] or 0.2, function(v)
-        self.ToggleSpeed = v
-        saveData["ToggleSpeed"] = v
-        persist()
-    end, 0.05)
-    self.ToggleSpeed = saveData["ToggleSpeed"] or 0.2
-
-    -- ✅ SLIDER DE ANIMAÇÃO GLOBAL (afeta TUDO)
-    panelSlider("Global Animation Speed", 0.25, 3.0, saveData["AnimSpeed"] or 1.0, function(v)
+    -- ✅ APENAS UM slider de animação (o global)
+    panelSlider("Animation Speed", 0.25, 3.0, saveData["AnimSpeed"] or 1.0, function(v)
         self:SetAnimationSpeed(v)
     end, 0.05)
 
@@ -3206,20 +3127,129 @@ function SwatUI:CreateWindow(title, size)
         self:Notify({ Title = "Toggle Key", Description = "Set to: " .. keyName, Duration = 2, Type = "success" })
     end)
 
-    -- ✅ Dropdown para escolher modo de minimize
-    panelDropdown("Minimize Mode", {"Mini", "Large"},
-        saveData["MinimizeMode"] or "Mini",
-        function(mode) self:SetMinimizeMode(mode) end)
-
-    panelDropdown("Font Family", fontNames, saveData["SelectedFont"] or "Gotham", function(fontName)
-        for _, fontEnum in ipairs(Enum.Font:GetEnumItems()) do
-            if fontEnum.Name == fontName then
-                applyFontToAll(fontEnum)
-                self:Notify({ Title = "Font", Description = "Alterado para " .. fontName, Duration = 2, Type = "success" })
-                break
-            end
+    -- ✅ FIX: 2 Toggles separados em vez de dropdown
+    panelToggle("Small Minimize", (saveData["MinimizeMode"] or "Mini") == "Mini", function(state)
+        if state then
+            self:SetMinimizeMode("Mini")
+            saveData["MinimizeMode"] = "Mini"
+            persist()
         end
     end)
+    panelToggle("Large Minimize", (saveData["MinimizeMode"] or "Mini") == "Large", function(state)
+        if state then
+            self:SetMinimizeMode("Large")
+            saveData["MinimizeMode"] = "Large"
+            persist()
+        end
+    end)
+
+    -- ✅ FIX: Removido "Toggle Anim Speed" antigo (unificado em Animation Speed)
+    self.ToggleSpeed = saveData["ToggleSpeed"] or 0.2
+
+    -- ✅ FIX: dropdown de fonte
+    local fontDropdown
+    fontDropdown = (function()
+        local row = Create("Frame", {
+            Size = UDim2.new(1, 0, 0, 54),
+            BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
+            LayoutOrder = nextSO(), ClipsDescendants = true,
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
+        row.Parent = settingsScroll
+        Create("TextLabel", {
+            Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 4),
+            BackgroundTransparency = 1, Text = "Font Family",
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }).Parent = row
+        local mainBtn = Create("TextButton", {
+            Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 22),
+            BackgroundColor3 = Theme.Panel, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
+        mainBtn.Parent = row
+        local btnText = Create("TextLabel", {
+            Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 10, 0, 0),
+            BackgroundTransparency = 1, Text = saveData["SelectedFont"] or "Gotham",
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        })
+        btnText.Parent = mainBtn
+        local arrow = Create("TextLabel", {
+            Size = UDim2.new(0, 24, 1, 0), Position = UDim2.new(1, -24, 0, 0),
+            BackgroundTransparency = 1, Text = "▼",
+            TextColor3 = self.CurrentAccentColor or Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 9,
+        })
+        arrow.Parent = mainBtn
+        local listFrame = Create("Frame", {
+            Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 52),
+            BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
+            Visible = false, ClipsDescendants = true, ZIndex = 15,
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
+        listFrame.Parent = row
+        local listScroll = Create("ScrollingFrame", {
+            Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0,
+            ScrollBarThickness = 4, ScrollBarImageColor3 = Theme.AccentDark,
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            ScrollingDirection = Enum.ScrollingDirection.Y,
+            ElasticBehavior = Enum.ElasticBehavior.Never, ZIndex = 16,
+        })
+        listScroll.Parent = listFrame
+        Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) }).Parent = listScroll
+        local isOpen = false
+        local selected = saveData["SelectedFont"] or "Gotham"
+        local function closeList()
+            if not isOpen then return end
+            isOpen = false
+            arrow.Text = "▼"
+            Tween(listFrame, 0.18, { Size = UDim2.new(1, -20, 0, 0) })
+            Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 54) })
+            task.spawn(function()
+                task.wait(AnimTime(0.19))
+                listFrame.Visible = false
+            end)
+        end
+        local function openList()
+            if isOpen then return end
+            isOpen = true
+            arrow.Text = "▲"
+            listFrame.Visible = true
+            local finalH = math.min(#fontNames * 24 + 8, 170)
+            TweenBack(listFrame, 0.3, { Size = UDim2.new(1, -20, 0, finalH) })
+            TweenBack(row, 0.3, { Size = UDim2.new(1, 0, 0, 54 + finalH + 6) })
+        end
+        for i, opt in ipairs(fontNames) do
+            local item = Create("TextButton", {
+                Size = UDim2.new(1, -6, 0, 22), BackgroundColor3 = Theme.Element,
+                BorderSizePixel = 0, Text = opt, TextColor3 = Theme.TextDim,
+                Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
+                LayoutOrder = i, ZIndex = 17,
+            }, { Corner(6) })
+            item.Parent = listScroll
+            item.MouseEnter:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.ElementHover }) end)
+            item.MouseLeave:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.Element }) end)
+            item.MouseButton1Click:Connect(function()
+                selected = opt; btnText.Text = opt
+                closeList()
+                for _, fontEnum in ipairs(Enum.Font:GetEnumItems()) do
+                    if fontEnum.Name == opt then
+                        applyFontToAll(fontEnum)
+                        self:Notify({ Title = "Font", Description = "Alterado para " .. opt, Duration = 2, Type = "success" })
+                        break
+                    end
+                end
+            end)
+        end
+        mainBtn.MouseButton1Click:Connect(function()
+            if isOpen then closeList() else openList() end
+        end)
+        -- ✅ refresh
+        local function refresh()
+            arrow.TextColor3 = self.CurrentAccentColor or Theme.Accent
+        end
+        registerSettingsRow(row, nil, refresh)
+        return { SetValue = function(v) selected = v; btnText.Text = v end, GetValue = function() return selected end }
+    end)()
+    table.insert(panelRefs, { api = fontDropdown, default = "Gotham" })
 
     local notifyEnabled = saveData["NotifyEnabled"]
     if notifyEnabled == nil then notifyEnabled = true end
@@ -3373,9 +3403,103 @@ function SwatUI:CreateWindow(title, size)
     panelToggle("Bottom Drag Bar", dragBarActive, setDragBar)
     if dragBarActive then task.delay(0.4, function() setDragBar(true) end) end
 
-    panelDropdown("Theme Color", ColorList, saveData["ThemeColor"] or "Blue", function(name)
-        self:ApplyThemeColor(name)
-    end)
+    -- ✅ Theme Color dropdown (com refresh)
+    local themeDropdown
+    do
+        local row = Create("Frame", {
+            Size = UDim2.new(1, 0, 0, 54),
+            BackgroundColor3 = Theme.Element, BorderSizePixel = 0,
+            LayoutOrder = nextSO(), ClipsDescendants = true,
+        }, { Corner(8), Stroke(Theme.Stroke, 1) })
+        row.Parent = settingsScroll
+        Create("TextLabel", {
+            Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 4),
+            BackgroundTransparency = 1, Text = "Theme Color",
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }).Parent = row
+        local mainBtn = Create("TextButton", {
+            Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 22),
+            BackgroundColor3 = Theme.Panel, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
+        mainBtn.Parent = row
+        local btnText = Create("TextLabel", {
+            Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 10, 0, 0),
+            BackgroundTransparency = 1, Text = saveData["ThemeColor"] or "Blue",
+            TextColor3 = Theme.Text, Font = Enum.Font.Gotham, TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        })
+        btnText.Parent = mainBtn
+        local arrow = Create("TextLabel", {
+            Size = UDim2.new(0, 24, 1, 0), Position = UDim2.new(1, -24, 0, 0),
+            BackgroundTransparency = 1, Text = "▼",
+            TextColor3 = self.CurrentAccentColor or Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 9,
+        })
+        arrow.Parent = mainBtn
+        local listFrame = Create("Frame", {
+            Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 52),
+            BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
+            Visible = false, ClipsDescendants = true, ZIndex = 15,
+        }, { Corner(8), Stroke(Theme.StrokeLight, 1) })
+        listFrame.Parent = row
+        local listScroll = Create("ScrollingFrame", {
+            Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0,
+            ScrollBarThickness = 4, ScrollBarImageColor3 = Theme.AccentDark,
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            ScrollingDirection = Enum.ScrollingDirection.Y,
+            ElasticBehavior = Enum.ElasticBehavior.Never, ZIndex = 16,
+        })
+        listScroll.Parent = listFrame
+        Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) }).Parent = listScroll
+        local isOpen = false
+        local selected = saveData["ThemeColor"] or "Blue"
+        local function closeList()
+            if not isOpen then return end
+            isOpen = false
+            arrow.Text = "▼"
+            Tween(listFrame, 0.18, { Size = UDim2.new(1, -20, 0, 0) })
+            Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 54) })
+            task.spawn(function()
+                task.wait(AnimTime(0.19))
+                listFrame.Visible = false
+            end)
+        end
+        local function openList()
+            if isOpen then return end
+            isOpen = true
+            arrow.Text = "▲"
+            listFrame.Visible = true
+            local finalH = math.min(#ColorList * 24 + 8, 170)
+            TweenBack(listFrame, 0.3, { Size = UDim2.new(1, -20, 0, finalH) })
+            TweenBack(row, 0.3, { Size = UDim2.new(1, 0, 0, 54 + finalH + 6) })
+        end
+        for i, opt in ipairs(ColorList) do
+            local item = Create("TextButton", {
+                Size = UDim2.new(1, -6, 0, 22), BackgroundColor3 = Theme.Element,
+                BorderSizePixel = 0, Text = opt, TextColor3 = Theme.TextDim,
+                Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
+                LayoutOrder = i, ZIndex = 17,
+            }, { Corner(6) })
+            item.Parent = listScroll
+            item.MouseEnter:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.ElementHover }) end)
+            item.MouseLeave:Connect(function() Tween(item, 0.12, { BackgroundColor3 = Theme.Element }) end)
+            item.MouseButton1Click:Connect(function()
+                selected = opt; btnText.Text = opt
+                closeList()
+                self:ApplyThemeColor(opt)
+            end)
+        end
+        mainBtn.MouseButton1Click:Connect(function()
+            if isOpen then closeList() else openList() end
+        end)
+        local function refresh()
+            arrow.TextColor3 = self.CurrentAccentColor or Theme.Accent
+        end
+        registerSettingsRow(row, nil, refresh)
+        themeDropdown = { SetValue = function(v) selected = v; btnText.Text = v end, GetValue = function() return selected end }
+        table.insert(panelRefs, { api = themeDropdown, default = "Blue" })
+    end
 
     if saveData["ThemeColor"] and ColorThemes[saveData["ThemeColor"]] then
         task.defer(function() self:ApplyThemeColor(saveData["ThemeColor"]) end)
@@ -3564,7 +3688,6 @@ function SwatUI:CreateWindow(title, size)
             Icon = tabButton:FindFirstChild("TabIcon")
         }
 
-        -- ✅ Efeito de segurar a aba (destaca + cresce levemente)
         local holding = false
         local function highlight()
             if holding then return end
@@ -4301,6 +4424,13 @@ function SwatUI:_ExtendTab(tab)
                 for _, el in ipairs(window.Registry.all) do
                     if el.Frame and el.Frame.Parent then
                         if el.RefreshColor then pcall(el.RefreshColor) end
+                    end
+                end
+                for _, ref in ipairs(window._settingsRowRefs) do
+                    if ref.row and ref.row.Parent then
+                        recolorTree(ref.row, oldAccent, oldDark, oldHover, c,
+                            c:Lerp(Color3.new(0,0,0), 0.65), c:Lerp(Color3.new(1,1,1), 0.22))
+                        if ref.refresh then pcall(ref.refresh) end
                     end
                 end
             end
