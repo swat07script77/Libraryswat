@@ -1,12 +1,11 @@
-
 --[[
-    SwatUI Library v13 (FINAL)
-    - Menu SEMPRE por cima de TUDO (CoreGui + DisplayOrder máximo) ✅
-    - Elementos aparecem corretamente (ZIndexBehavior.Sibling) ✅
-    - Cor mais chamativa sem exagero ✅
-    - Efeito "segurar aba" (destaca e volta) ✅
-    - Color Picker / Dropdown estáveis ✅
-    - Otimizado (menos conexões, tweens gerenciados) ✅
+    SwatUI Library v14 (FINAL)
+    - Cores vibrantes + contraste melhorado ✅
+    - Fix: Settings panel agora atualiza cor corretamente ✅
+    - Toggle: borda accent + centro dark + bola maior ao segurar ✅
+    - Slider: bola maior + transparente ao segurar ✅
+    - Save Mini Menu Position ✅
+    - Save Main Menu Position ✅
 ]]
 
 local SwatUI = {}
@@ -18,8 +17,6 @@ local TweenService     = game:GetService("TweenService")
 local HttpService      = game:GetService("HttpService")
 local LocalPlayer      = Players.LocalPlayer
 
--- ============================================================
--- BANCO DE ÍCONES (vazio — você adiciona via SetIcons)
 -- ============================================================
 local LibraryIcons = {
     ["a-arrow-down"] = 92867583610071,
@@ -1678,19 +1675,29 @@ end
 function SwatUI:GetIcons() return LibraryIcons end
 
 -- ============================================================
--- TEMA
+-- TEMA — CORES MUITO MAIS VIBRANTES E CONTRASTADAS
 -- ============================================================
 local DefaultTheme = {
-    Background = Color3.fromRGB(13,15,20), BackgroundAlt = Color3.fromRGB(17,20,27),
-    Panel = Color3.fromRGB(22,25,32), Element = Color3.fromRGB(30,34,44),
-    ElementHover = Color3.fromRGB(44,50,64), ElementActive = Color3.fromRGB(52,36,52),
-    Stroke = Color3.fromRGB(52,58,74), StrokeLight = Color3.fromRGB(78,86,104),
-    Accent = Color3.fromRGB(96,176,255), AccentHover = Color3.fromRGB(140,200,255),
-    AccentDark = Color3.fromRGB(44,100,178), Text = Color3.fromRGB(244,248,255),
-    TextDim = Color3.fromRGB(180,190,210), TextMuted = Color3.fromRGB(130,142,164),
-    Success = Color3.fromRGB(88,220,140), Warning = Color3.fromRGB(255,196,84),
-    Error = Color3.fromRGB(255,100,100), CornerRadius = 13,
-    TitleFont = Enum.Font.GothamBold, ElementFont = Enum.Font.Gotham,
+    Background   = Color3.fromRGB(10, 11, 16),
+    BackgroundAlt= Color3.fromRGB(14, 16, 23),
+    Panel        = Color3.fromRGB(20, 23, 32),
+    Element      = Color3.fromRGB(30, 35, 47),
+    ElementHover = Color3.fromRGB(46, 54, 72),
+    ElementActive= Color3.fromRGB(60, 40, 80),
+    Stroke       = Color3.fromRGB(58, 66, 86),
+    StrokeLight  = Color3.fromRGB(96, 108, 134),
+    Accent       = Color3.fromRGB(88, 190, 255),   -- azul elétrico vivo
+    AccentHover  = Color3.fromRGB(160, 220, 255),
+    AccentDark   = Color3.fromRGB(36, 108, 200),
+    Text         = Color3.fromRGB(245, 248, 255),
+    TextDim      = Color3.fromRGB(190, 200, 220),
+    TextMuted    = Color3.fromRGB(140, 152, 176),
+    Success      = Color3.fromRGB(80, 235, 145),
+    Warning      = Color3.fromRGB(255, 200, 70),
+    Error        = Color3.fromRGB(255, 96, 96),
+    CornerRadius = 13,
+    TitleFont    = Enum.Font.GothamBold,
+    ElementFont  = Enum.Font.Gotham,
 }
 
 local Theme = {}
@@ -1935,8 +1942,6 @@ function SwatUI:CreateWindow(title, size)
     self.Size = defaultSize
     self.DefaultSize = defaultSize
 
-    -- ✅ FIX: ZIndexBehavior.Sibling (funciona normalmente com hierarquia)
-    -- + CoreGui + DisplayOrder máximo = por cima de TUDO sem quebrar elementos
     local gui = Create("ScreenGui", {
         Name = "SwatUI", ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -1960,7 +1965,7 @@ function SwatUI:CreateWindow(title, size)
         Position = UDim2.new(0.5, -defaultSize.X.Offset / 2, 0.5, -defaultSize.Y.Offset / 2),
         BackgroundColor3 = Theme.Background, BorderSizePixel = 0,
         Active = true, ClipsDescendants = false,
-    }, { Corner(16), Stroke(Theme.Stroke, 1.5) })
+    }, { Corner(16), Stroke(Theme.AccentDark, 1.5) })
     main.Parent = gui
     self.MainFrame = main
     MakeDraggable(main)
@@ -2018,7 +2023,7 @@ function SwatUI:CreateWindow(title, size)
 
     local closeBtn = makeTitleButton("X", Theme.Error, -36, 12)
     local minBtn   = makeTitleButton("-", Theme.Warning, -70, 16)
-    local gearBtn  = makeTitleButton("⚙️", Theme.Panel, -104, 14)
+    local gearBtn  = makeTitleButton("⚙", Theme.Panel, -104, 14)
     gearBtn.TextColor3 = Theme.Accent
 
     self.CloseButton = closeBtn
@@ -2140,16 +2145,74 @@ function SwatUI:CreateWindow(title, size)
         end)
     end
 
+    -- ============================================================
+    -- SAVE SYSTEM (declarado antes dos helpers de posição)
+    -- ============================================================
+    local SAVE_FILE = "SwatUIConfig.json"
+    local saveData = {}
+
+    do
+        if isfile and readfile then
+            local okr, raw = pcall(readfile, SAVE_FILE)
+            if okr and raw and raw ~= "" then
+                local ok2, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
+                if ok2 and type(decoded) == "table" then
+                    saveData = decoded
+                end
+            end
+        end
+    end
+
+    local function persist()
+        if not (isfile and writefile) then return false end
+        local okp, encoded = pcall(function() return HttpService:JSONEncode(saveData) end)
+        if not okp then return false end
+        return pcall(writefile, SAVE_FILE, encoded)
+    end
+
+    -- ============================================================
+    -- SAVE POSITION HELPERS
+    -- ============================================================
+    self._saveMiniPos = saveData["SaveMiniPos"] or false
+    self._saveMainPos = saveData["SaveMainPos"] or false
+
+    local function captureMainPos()
+        saveData["MainPos"] = {
+            XScale = main.Position.X.Scale, XOffset = main.Position.X.Offset,
+            YScale = main.Position.Y.Scale, YOffset = main.Position.Y.Offset,
+        }
+        persist()
+    end
+
+    local function captureMiniPos()
+        saveData["MiniPos"] = {
+            XScale = miniBar.Position.X.Scale, XOffset = miniBar.Position.X.Offset,
+            YScale = miniBar.Position.Y.Scale, YOffset = miniBar.Position.Y.Offset,
+        }
+        persist()
+    end
+
+    if self._saveMainPos and saveData["MainPos"] then
+        local p = saveData["MainPos"]
+        main.Position = UDim2.new(p.XScale, p.XOffset, p.YScale, p.YOffset)
+    end
+    if self._saveMiniPos and saveData["MiniPos"] then
+        local p = saveData["MiniPos"]
+        miniBar.Position = UDim2.new(p.XScale, p.XOffset, p.YScale, p.YOffset)
+    end
+
     local function restoreWindow()
         if not self.IsMinimized then return end
         self.IsMinimized = false
+
+        if self._saveMiniPos then captureMiniPos() end
+
         TweenService:Create(miniBar, TweenInfo.new(0.28, Enum.EasingStyle.Sine), {
             Size = UDim2.new(0, 0, 0, 44), Position = UDim2.new(0.5, 0, 0, 10), BackgroundTransparency = 1,
         }):Play()
         task.delay(0.3, function()
             miniBar.Visible = false
             miniBar.Size = UDim2.new(0, 0, 0, 44)
-            miniBar.Position = UDim2.new(0.5, 0, 0, 10)
             miniBar.BackgroundTransparency = 0.05
         end)
         main.Visible = true
@@ -2157,10 +2220,19 @@ function SwatUI:CreateWindow(title, size)
         main.Position = UDim2.new(0.5, 0, 0.5, 0)
         main.BackgroundTransparency = 1
         local bgT = self.CurrentBgTransparency or 0
+
+        local targetPos
+        if self._saveMainPos and saveData["MainPos"] then
+            local p = saveData["MainPos"]
+            targetPos = UDim2.new(p.XScale, p.XOffset, p.YScale, p.YOffset)
+        else
+            targetPos = self.OriginalPosition or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2)
+        end
+
         local tween = TweenService:Create(main, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             BackgroundTransparency = bgT,
             Size = self.Size,
-            Position = self.OriginalPosition or UDim2.new(0.5, -self.Size.X.Offset/2, 0.5, -self.Size.Y.Offset/2),
+            Position = targetPos,
         })
         tween:Play()
         tween.Completed:Connect(function()
@@ -2192,7 +2264,10 @@ function SwatUI:CreateWindow(title, size)
     local function minimizeWindow()
         if self.IsMinimized then return end
         self.IsMinimized = true
-        if not self.OriginalPosition then self.OriginalPosition = main.Position end
+
+        self.OriginalPosition = main.Position
+        if self._saveMainPos then captureMainPos() end
+
         local hideMain = TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {
             BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0),
         })
@@ -2201,7 +2276,14 @@ function SwatUI:CreateWindow(title, size)
             main.Visible = false
             local barWidth = isTouch and 240 or 260
             miniBar.Size = UDim2.new(0, 0, 0, 44)
-            miniBar.Position = UDim2.new(0.5, -barWidth/2, 0, 10)
+
+            if self._saveMiniPos and saveData["MiniPos"] then
+                local p = saveData["MiniPos"]
+                miniBar.Position = UDim2.new(p.XScale, p.XOffset, p.YScale, p.YOffset)
+            else
+                miniBar.Position = UDim2.new(0.5, -barWidth/2, 0, 10)
+            end
+
             miniBar.BackgroundTransparency = 1
             miniBar.Visible = true
             TweenService:Create(miniBar, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
@@ -2336,98 +2418,97 @@ function SwatUI:CreateWindow(title, size)
     self.IsTouch = isTouch
 
     -- ============================================================
-    -- SAVE SYSTEM
-    -- ============================================================
-    local SAVE_FILE = "SwatUIConfig.json"
-    local saveData = {}
-
-    do
-        if isfile and readfile then
-            local ok, raw = pcall(readfile, SAVE_FILE)
-            if ok and raw and raw ~= "" then
-                local ok2, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
-                if ok2 and type(decoded) == "table" then
-                    saveData = decoded
-                end
-            end
-        end
-    end
-
-    local function persist()
-        if not (isfile and writefile) then return false end
-        local ok, encoded = pcall(function() return HttpService:JSONEncode(saveData) end)
-        if not ok then return false end
-        return pcall(writefile, SAVE_FILE, encoded)
-    end
-
-    -- ============================================================
-    -- COLOR THEMES
+    -- COLOR THEMES — cores mais fortes
     -- ============================================================
     local ColorThemes = {
-        Red=Color3.fromRGB(255,70,70), Green=Color3.fromRGB(64,230,120),
-        Yellow=Color3.fromRGB(246,210,60), Blue=Color3.fromRGB(70,160,255),
-        Pink=Color3.fromRGB(255,120,190), Purple=Color3.fromRGB(196,90,255),
-        Orange=Color3.fromRGB(255,160,60), Cyan=Color3.fromRGB(64,240,255),
-        Teal=Color3.fromRGB(60,220,196), Lime=Color3.fromRGB(170,255,64),
+        Red=Color3.fromRGB(255,72,72), Green=Color3.fromRGB(64,235,120),
+        Yellow=Color3.fromRGB(250,215,55), Blue=Color3.fromRGB(90,180,255),
+        Pink=Color3.fromRGB(255,120,200), Purple=Color3.fromRGB(200,96,255),
+        Orange=Color3.fromRGB(255,160,64), Cyan=Color3.fromRGB(64,240,255),
+        Teal=Color3.fromRGB(48,225,200), Lime=Color3.fromRGB(180,255,64),
         Magenta=Color3.fromRGB(255,64,210), Coral=Color3.fromRGB(255,120,100),
-        Gold=Color3.fromRGB(255,214,32), Indigo=Color3.fromRGB(110,60,220),
-        Violet=Color3.fromRGB(224,140,255), Turquoise=Color3.fromRGB(70,232,220),
+        Gold=Color3.fromRGB(255,214,32), Indigo=Color3.fromRGB(112,60,235),
+        Violet=Color3.fromRGB(224,140,255), Turquoise=Color3.fromRGB(70,235,225),
         Salmon=Color3.fromRGB(255,140,124), Plum=Color3.fromRGB(230,170,230),
-        SkyBlue=Color3.fromRGB(120,200,255), Peach=Color3.fromRGB(255,206,170),
+        SkyBlue=Color3.fromRGB(120,205,255), Peach=Color3.fromRGB(255,206,170),
         Mint=Color3.fromRGB(120,255,190), Lavender=Color3.fromRGB(204,170,255),
         Apricot=Color3.fromRGB(255,206,148), ElectricBlue=Color3.fromRGB(70,200,255),
         Rose=Color3.fromRGB(255,90,160), Chocolate=Color3.fromRGB(210,140,80),
-        Aqua=Color3.fromRGB(30,255,210), Crimson=Color3.fromRGB(230,36,80),
-        Navy=Color3.fromRGB(60,80,200), Olive=Color3.fromRGB(170,190,70),
-        Amber=Color3.fromRGB(255,190,60), Slate=Color3.fromRGB(140,160,190),
-        Ruby=Color3.fromRGB(230,50,100), Emerald=Color3.fromRGB(64,224,140),
-        Sapphire=Color3.fromRGB(70,130,240),
+        Aqua=Color3.fromRGB(30,255,210), Crimson=Color3.fromRGB(235,40,90),
+        Navy=Color3.fromRGB(72,96,220), Olive=Color3.fromRGB(180,200,72),
+        Amber=Color3.fromRGB(255,190,60), Slate=Color3.fromRGB(150,170,200),
+        Ruby=Color3.fromRGB(235,50,110), Emerald=Color3.fromRGB(64,224,140),
+        Sapphire=Color3.fromRGB(80,140,255),
     }
-    local ColorThemesDark = {}
-    local ColorThemesHover = {}
+    local ColorThemesDark, ColorThemesHover = {}, {}
     for name, base in pairs(ColorThemes) do
-        ColorThemesDark[name] = base:Lerp(Color3.new(0,0,0), 0.65)
-        ColorThemesHover[name] = base:Lerp(Color3.new(1,1,1), 0.22)
+        ColorThemesDark[name] = base:Lerp(Color3.new(0,0,0), 0.6)
+        ColorThemesHover[name] = base:Lerp(Color3.new(1,1,1), 0.25)
     end
     local ColorList = {}
     for name in pairs(ColorThemes) do table.insert(ColorList, name) end
     table.sort(ColorList)
 
+    -- ============================================================
+    -- FIX: recolorTree — percorre children manualmente para pegar
+    -- TODOS os elementos, inclusive os que estão dentro de painéis
+    -- ocultos (Settings panel). Antes o filtro de cor antiga pulava
+    -- alguns filhos porque o panel era "main" e o loop era em
+    -- gui:GetDescendants() — alguns elementos no settings tinham
+    -- cores levemente diferentes (arredondadas).
+    -- ============================================================
     local function recolorTree(root, oldAccent, oldDark, oldHover, base, dark, hover)
         if not root then return end
-        for _, d in ipairs(root:GetDescendants()) do
+
+        local function colorMatches(c, target)
+            if not c or not target then return false end
+            return math.abs(c.R - target.R) < 0.01
+               and math.abs(c.G - target.G) < 0.01
+               and math.abs(c.B - target.B) < 0.01
+        end
+
+        local function applyOn(d)
             pcall(function()
                 if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox") then
                     local bg = d.BackgroundColor3
-                    if bg == oldAccent then d.BackgroundColor3 = base end
-                    if bg == oldDark then d.BackgroundColor3 = dark end
-                    if bg == oldHover then d.BackgroundColor3 = hover end
+                    if colorMatches(bg, oldAccent) then d.BackgroundColor3 = base
+                    elseif colorMatches(bg, oldDark) then d.BackgroundColor3 = dark
+                    elseif colorMatches(bg, oldHover) then d.BackgroundColor3 = hover end
                 end
-                if d:IsA("TextLabel") or d:IsA("TextButton") then
-                    if d.TextColor3 == oldAccent then d.TextColor3 = base end
-                    if d.TextColor3 == oldDark then d.TextColor3 = dark end
-                    if d.TextColor3 == oldHover then d.TextColor3 = hover end
+                if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+                    local tc = d.TextColor3
+                    if colorMatches(tc, oldAccent) then d.TextColor3 = base
+                    elseif colorMatches(tc, oldDark) then d.TextColor3 = dark
+                    elseif colorMatches(tc, oldHover) then d.TextColor3 = hover end
                 end
                 if d:IsA("ImageLabel") or d:IsA("ImageButton") then
-                    if d.ImageColor3 == oldAccent then d.ImageColor3 = base end
-                    if d.ImageColor3 == oldDark then d.ImageColor3 = dark end
+                    local ic = d.ImageColor3
+                    if colorMatches(ic, oldAccent) then d.ImageColor3 = base
+                    elseif colorMatches(ic, oldDark) then d.ImageColor3 = dark
+                    elseif colorMatches(ic, oldHover) then d.ImageColor3 = hover end
                 end
                 local st = d:FindFirstChildOfClass("UIStroke")
                 if st then
-                    if st.Color == oldAccent then st.Color = base end
-                    if st.Color == oldDark then st.Color = dark end
-                    if st.Color == oldHover then st.Color = hover end
+                    if colorMatches(st.Color, oldAccent) then st.Color = base
+                    elseif colorMatches(st.Color, oldDark) then st.Color = dark
+                    elseif colorMatches(st.Color, oldHover) then st.Color = hover end
                 end
                 local grad = d:FindFirstChildOfClass("UIGradient")
                 if grad then
-                    local k0 = grad.Color.Keypoints[1].Value
-                    local k1 = grad.Color.Keypoints[#grad.Color.Keypoints].Value
-                    if k0 == oldDark or k1 == oldAccent then
+                    local kps = grad.Color.Keypoints
+                    local k0 = kps[1].Value
+                    local k1 = kps[#kps].Value
+                    if colorMatches(k0, oldDark) or colorMatches(k1, oldAccent) then
                         grad.Color = ColorSequence.new(dark, base)
+                    elseif colorMatches(k0, oldAccent) or colorMatches(k1, oldDark) then
+                        grad.Color = ColorSequence.new(base, dark)
                     end
                 end
             end)
         end
+
+        applyOn(root)
+        for _, d in ipairs(root:GetDescendants()) do applyOn(d) end
     end
 
     function self:ApplyThemeColor(colorName)
@@ -2449,6 +2530,7 @@ function SwatUI:CreateWindow(title, size)
             ElementActive = dark, StrokeLight = base, Success = base,
         })
 
+        -- 1) Recolore TODOS os elementos registrados
         for _, el in ipairs(self.Registry.all) do
             local t = el:GetType()
             if t ~= "colorPickers" and t ~= "dropdowns" then
@@ -2460,33 +2542,49 @@ function SwatUI:CreateWindow(title, size)
             end
         end
 
+        -- 2) Recolore o GUi principal inteiro (pega settings panel, título, etc.)
+        recolorTree(gui, oldAccent, oldDark, oldHover, base, dark, hover)
+        recolorTree(overlayGui, oldAccent, oldDark, oldHover, base, dark, hover)
+
+        -- 3) Reforça cores específicas do título
         titleAccentLine.BackgroundColor3 = base
         local tg = titleAccentLine:FindFirstChildOfClass("UIGradient")
         if tg then tg.Color = ColorSequence.new(dark, base) end
         titleAccentDot.BackgroundColor3 = base
         local tds = titleAccentDot:FindFirstChildOfClass("UIStroke")
         if tds then tds.Color = hover end
+        gearBtn.TextColor3 = base
 
+        -- 4) Bordas do main
+        local mainStroke = main:FindFirstChildOfClass("UIStroke")
+        if mainStroke then mainStroke.Color = dark end
+
+        -- 5) Abas
         for _, t in ipairs(self._tabs) do
             if t.Indicator then t.Indicator.BackgroundColor3 = base end
-            if t._selected then t.Button.BackgroundColor3 = dark
-            else t.Button.BackgroundColor3 = Theme.Element end
+            if t._selected then
+                t.Button.BackgroundColor3 = dark
+                if t.Label then t.Label.TextColor3 = Color3.fromRGB(255,255,255) end
+                if t.Icon then t.Icon.ImageColor3 = Color3.fromRGB(255,255,255) end
+            else
+                t.Button.BackgroundColor3 = Theme.Element
+            end
         end
 
+        -- 6) Settings panel — reforço explícito
         if settingsPanel then
-            recolorTree(settingsPanel, oldAccent, oldDark, oldHover, base, dark, hover)
+            local ps = settingsPanel:FindFirstChildOfClass("UIStroke")
+            if ps then ps.Color = dark end
             local headerLine = settingsPanel:FindFirstChild("HeaderLine")
             if headerLine then
                 headerLine.BackgroundColor3 = base
                 local g = headerLine:FindFirstChildOfClass("UIGradient")
                 if g then g.Color = ColorSequence.new(dark, base) end
             end
-            local ps = settingsPanel:FindFirstChildOfClass("UIStroke")
-            if ps then ps.Color = dark end
         end
 
+        -- 7) Mini bar
         if miniBar then
-            recolorTree(miniBar, oldAccent, oldDark, oldHover, base, dark, hover)
             local mbs = miniBar:FindFirstChildOfClass("UIStroke")
             if mbs then mbs.Color = dark end
             for _, ch in ipairs(miniBar:GetChildren()) do
@@ -2503,10 +2601,20 @@ function SwatUI:CreateWindow(title, size)
             end
         end
 
-        if overlayGui then recolorTree(overlayGui, oldAccent, oldDark, oldHover, base, dark, hover) end
-
+        -- 8) Glows
         for _, d in ipairs(gui:GetDescendants()) do
             if d.Name == "SwatGlow" then d.BackgroundColor3 = base end
+        end
+        for _, d in ipairs(overlayGui:GetDescendants()) do
+            if d.Name == "SwatGlow" then d.BackgroundColor3 = base end
+        end
+
+        -- 9) Reaplica strokes de toggles/sliders via Render/RefreshColor
+        for _, el in ipairs(self.Registry.all) do
+            local t = el:GetType()
+            if t == "toggles" and el.Render then pcall(el.Render) end
+            if t == "sliders" and el.RefreshColor then pcall(el.RefreshColor) end
+            if t == "dropdowns" and el.RefreshColor then pcall(el.RefreshColor) end
         end
 
         saveData["ThemeColor"] = colorName
@@ -2702,7 +2810,7 @@ function SwatUI:CreateWindow(title, size)
     -- SETTINGS PANEL
     -- ============================================================
     local PANEL_WIDTH = 250
-    local PANEL_HEIGHT = 420
+    local PANEL_HEIGHT = 520
     local panelRefs = {}
 
     local settingsPanel = Create("Frame", {
@@ -2724,7 +2832,7 @@ function SwatUI:CreateWindow(title, size)
 
     Create("TextLabel", {
         Size = UDim2.new(1, -20, 0, 28), Position = UDim2.new(0, 12, 0, 4),
-        BackgroundTransparency = 1, Text = "⚙  SETTINGS",
+        BackgroundTransparency = 1, Text = "SETTINGS",
         TextColor3 = Theme.Text, Font = Theme.TitleFont, TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 10,
     }).Parent = settingsPanel
@@ -2761,9 +2869,9 @@ function SwatUI:CreateWindow(title, size)
         }).Parent = row
         local pill = Create("Frame", {
             Size = UDim2.new(0, 38, 0, 20), Position = UDim2.new(1, -48, 0.5, -10),
-            BackgroundColor3 = default and (self.CurrentAccentColor or Theme.Accent) or Theme.ElementHover,
+            BackgroundColor3 = default and (self.CurrentAccentDark or Theme.AccentDark) or Theme.ElementHover,
             BorderSizePixel = 0,
-        }, { Corner(99), Stroke(default and (self.CurrentAccentDark or Theme.AccentDark) or Theme.StrokeLight, 1) })
+        }, { Corner(99), Stroke(default and (self.CurrentAccentColor or Theme.Accent) or Theme.StrokeLight, 1) })
         pill.Parent = row
         local pillStroke = pill:FindFirstChildOfClass("UIStroke")
         local circle = Create("Frame", {
@@ -2779,8 +2887,8 @@ function SwatUI:CreateWindow(title, size)
         local function render()
             local col = self.CurrentAccentColor or Theme.Accent
             local dark = self.CurrentAccentDark or Theme.AccentDark
-            Tween(pill, 0.15, { BackgroundColor3 = state and col or Theme.ElementHover })
-            if pillStroke then Tween(pillStroke, 0.15, { Color = state and dark or Theme.StrokeLight }) end
+            Tween(pill, 0.15, { BackgroundColor3 = state and dark or Theme.ElementHover })
+            if pillStroke then Tween(pillStroke, 0.15, { Color = state and col or Theme.StrokeLight }) end
             Tween(circle, 0.15, { Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8) })
         end
         btn.MouseButton1Click:Connect(function()
@@ -2887,7 +2995,7 @@ function SwatUI:CreateWindow(title, size)
 
         local arrow = Create("TextLabel", {
             Size = UDim2.new(0, 24, 1, 0), Position = UDim2.new(1, -24, 0, 0),
-            BackgroundTransparency = 1, Text = "▼",
+            BackgroundTransparency = 1, Text = "v",
             TextColor3 = self.CurrentAccentColor or Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 9,
         })
         arrow.Parent = mainBtn
@@ -2916,7 +3024,7 @@ function SwatUI:CreateWindow(title, size)
         local function closeList()
             if not isOpen then return end
             isOpen = false
-            arrow.Text = "▼"
+            arrow.Text = "v"
             Tween(listFrame, 0.18, { Size = UDim2.new(1, -20, 0, 0) })
             Tween(row, 0.18, { Size = UDim2.new(1, 0, 0, 54) })
             task.delay(0.19, function() listFrame.Visible = false end)
@@ -2924,7 +3032,7 @@ function SwatUI:CreateWindow(title, size)
         local function openList()
             if isOpen then return end
             isOpen = true
-            arrow.Text = "▲"
+            arrow.Text = "^"
             listFrame.Visible = true
             local contentH = #options * 24 + 8
             local finalH = math.min(contentH, 170)
@@ -3003,7 +3111,7 @@ function SwatUI:CreateWindow(title, size)
             BackgroundColor3 = Theme.BackgroundAlt, BorderSizePixel = 0,
             Text = default or "K", TextColor3 = self.CurrentAccentColor or Theme.Accent,
             Font = Enum.Font.GothamBold, TextSize = 10, AutoButtonColor = false,
-        }, { Corner(8), Stroke(self.CurrentAccentDark or Theme.AccentDark, 1.5) })
+        }, { Corner(8), Stroke(self.CurrentAccentColor or Theme.Accent, 1.5) })
         keyBtn.Parent = row
         local listening = false
         keyBtn.MouseButton1Click:Connect(function()
@@ -3111,7 +3219,7 @@ function SwatUI:CreateWindow(title, size)
         for _, fontEnum in ipairs(Enum.Font:GetEnumItems()) do
             if fontEnum.Name == fontName then
                 applyFontToAll(fontEnum)
-                self:Notify({ Title = "Font", Description = "Alterado para " .. fontName, Duration = 2, Type = "success" })
+                self:Notify({ Title = "Font", Description = "Changed to " .. fontName, Duration = 2, Type = "success" })
                 break
             end
         end
@@ -3133,6 +3241,25 @@ function SwatUI:CreateWindow(title, size)
     end)
     panelSlider("Notification Duration", 1, 10, saveData["NotifyDuration"] or 3, function(v)
         saveData["NotifyDuration"] = v; persist()
+    end)
+
+    -- ============================================================
+    -- NOVOS TOGGLES: Save Mini / Save Main Position
+    -- ============================================================
+    panelToggle("Save Mini Menu Position", self._saveMiniPos, function(v)
+        self._saveMiniPos = v
+        saveData["SaveMiniPos"] = v
+        persist()
+        if v and miniBar and miniBar.Visible then captureMiniPos() end
+        if not v then saveData["MiniPos"] = nil; persist() end
+    end)
+
+    panelToggle("Save Main Menu Position", self._saveMainPos, function(v)
+        self._saveMainPos = v
+        saveData["SaveMainPos"] = v
+        persist()
+        if v then captureMainPos() end
+        if not v then saveData["MainPos"] = nil; persist() end
     end)
 
     local autoResize = saveData["AutoResize"] or false
@@ -3277,7 +3404,7 @@ function SwatUI:CreateWindow(title, size)
         task.defer(function() self:ApplyThemeColor(saveData["ThemeColor"]) end)
     end
 
-    panelButton("↺ RESET ALL SETTINGS", Theme.Error, function()
+    panelButton("RESET ALL SETTINGS", Theme.Error, function()
         pcall(function()
             if isfile and delfile and isfile(SAVE_FILE) then pcall(delfile, SAVE_FILE) end
             saveData = {}
@@ -3287,6 +3414,9 @@ function SwatUI:CreateWindow(title, size)
             self.CurrentAccentColor = Theme.Accent
             self.CurrentAccentDark = Theme.AccentDark
             self.CurrentAccentHover = Theme.AccentHover
+
+            self._saveMiniPos = false
+            self._saveMainPos = false
 
             for _, ref in ipairs(panelRefs) do
                 if ref.api and ref.api.SetValue then
@@ -3315,7 +3445,7 @@ function SwatUI:CreateWindow(title, size)
         pcall(function()
             self:ApplyThemeColor("Blue")
             persist()
-            self:Notify({ Title = "Reset", Description = "Tudo restaurado!", Duration = 2, Type = "success" })
+            self:Notify({ Title = "Reset", Description = "All settings restored!", Duration = 2, Type = "success" })
         end)
     end)
 
@@ -3389,7 +3519,7 @@ function SwatUI:CreateWindow(title, size)
     end
 
     -- ============================================================
-    -- CREATE TAB (com efeito de segurar)
+    -- CREATE TAB
     -- ============================================================
     function self:CreateTab(name, iconName)
         local tabButton = Create("TextButton", {
@@ -3458,7 +3588,6 @@ function SwatUI:CreateWindow(title, size)
             Icon = tabButton:FindFirstChild("TabIcon")
         }
 
-        -- ✅ Efeito de segurar a aba (destaca + cresce levemente)
         local holding = false
         local function highlight()
             if holding then return end
@@ -3810,6 +3939,9 @@ function SwatUI:_ExtendTab(tab)
         return el
     end
 
+    -- ============================================================
+    -- TOGGLE (v14 — borda accent + centro dark + bola maior ao segurar)
+    -- ============================================================
     function tab:CreateToggle(cfg)
         cfg = cfg or {}
         local toggled = cfg.Default or false
@@ -3833,12 +3965,12 @@ function SwatUI:_ExtendTab(tab)
 
         local bg = Create("Frame", {
             Size = UDim2.new(0, 50, 0, 24), Position = UDim2.new(1, -64, 0.5, -12),
-            BackgroundColor3 = toggled and (window.CurrentAccentColor or Theme.Accent) or Theme.ElementHover,
+            BackgroundColor3 = toggled and (window.CurrentAccentDark or Theme.AccentDark) or Theme.ElementHover,
             BorderSizePixel = 0,
         }, { Corner(99) })
         bg.Parent = frame
 
-        local bgStroke = Stroke(toggled and (window.CurrentAccentDark or Theme.AccentDark) or Theme.StrokeLight, 1)
+        local bgStroke = Stroke(toggled and (window.CurrentAccentColor or Theme.Accent) or Theme.StrokeLight, toggled and 2 or 1)
         bgStroke.Parent = bg
 
         local circle = Create("Frame", {
@@ -3852,17 +3984,48 @@ function SwatUI:_ExtendTab(tab)
             BackgroundTransparency = 1, Text = "" })
         btn.Parent = frame
 
+        local isHolding = false
+
         local function render()
-            local spd = window.ToggleSpeed or 0.2
             local col = window.CurrentAccentColor or Theme.Accent
             local dark = window.CurrentAccentDark or Theme.AccentDark
-            Tween(bg, spd, { BackgroundColor3 = toggled and col or Theme.ElementHover })
-            Tween(bgStroke, spd, { Color = toggled and dark or Theme.StrokeLight })
-            Tween(circle, spd, {
-                Position = toggled and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
-            })
+            local holdDark = dark:Lerp(Color3.new(0, 0, 0), 0.45)
+            local spd = isHolding and 0.1 or (window.ToggleSpeed or 0.2)
+            local cs = isHolding and 23 or 20
+
+            if toggled then
+                Tween(bg, spd, { BackgroundColor3 = isHolding and holdDark or dark })
+                Tween(bgStroke, spd, { Color = col, Thickness = isHolding and 2.5 or 2 })
+                Tween(circle, spd, {
+                    Size = UDim2.new(0, cs, 0, cs),
+                    Position = UDim2.new(1, -2 - cs, 0.5, -cs/2),
+                })
+            else
+                Tween(bg, spd, { BackgroundColor3 = isHolding and Theme.ElementHover:Lerp(Theme.BackgroundAlt, 0.35) or Theme.ElementHover })
+                Tween(bgStroke, spd, { Color = isHolding and col or Theme.StrokeLight, Thickness = isHolding and 2 or 1 })
+                Tween(circle, spd, {
+                    Size = UDim2.new(0, cs, 0, cs),
+                    Position = UDim2.new(0, isHolding and 1 or 2, 0.5, -cs/2),
+                })
+            end
             setStatus(toggled and Status.ON or Status.OFF)
         end
+
+        local function setHolding(v)
+            if isHolding == v then return end
+            isHolding = v
+            render()
+        end
+
+        btn.MouseButton1Down:Connect(function() setHolding(true) end)
+        btn.MouseButton1Up:Connect(function() setHolding(false) end)
+        btn.MouseLeave:Connect(function() setHolding(false) end)
+        btn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                setHolding(false)
+            end
+        end)
 
         btn.MouseButton1Click:Connect(function()
             toggled = not toggled
@@ -3887,6 +4050,9 @@ function SwatUI:_ExtendTab(tab)
         return el
     end
 
+    -- ============================================================
+    -- SLIDER (v14 — bola maior + transparente ao segurar)
+    -- ============================================================
     function tab:CreateSlider(cfg)
         cfg = cfg or {}
         local min = cfg.Min or 0
@@ -3948,6 +4114,7 @@ function SwatUI:_ExtendTab(tab)
         fill.Parent = bar
 
         local knobSize = isTouch and 18 or 14
+        local currentKnobSize = knobSize
         local knob = Create("Frame", {
             Size = UDim2.new(0, knobSize, 0, knobSize),
             Position = UDim2.new((value - min) / (max - min), -knobSize/2, 0.5, -knobSize/2),
@@ -3968,7 +4135,7 @@ function SwatUI:_ExtendTab(tab)
             value = v
             local rel = (value - min) / (max - min)
             fill.Size = UDim2.new(rel, 0, 1, 0)
-            knob.Position = UDim2.new(rel, -knobSize/2, 0.5, -knobSize/2)
+            knob.Position = UDim2.new(rel, -currentKnobSize/2, 0.5, -currentKnobSize/2)
             valText.Text = tostring(value)
             setStatus((value > min) and Status.ON or Status.OFF)
             if cb and cfg.Callback then task.spawn(cfg.Callback, value) end
@@ -3980,6 +4147,35 @@ function SwatUI:_ExtendTab(tab)
         end
 
         TrackDrag(click, function(input) fromX(input.Position.X) end)
+
+        local isKnobHeld = false
+        local function setKnobHeld(held)
+            if isKnobHeld == held then return end
+            isKnobHeld = held
+            currentKnobSize = held and (knobSize + 8) or knobSize
+            local rel = (value - min) / (max - min)
+            Tween(knob, 0.12, {
+                Size = UDim2.new(0, currentKnobSize, 0, currentKnobSize),
+                Position = UDim2.new(rel, -currentKnobSize/2, 0.5, -currentKnobSize/2),
+                BackgroundTransparency = held and 0.25 or 0,
+            })
+            if knobStroke then
+                Tween(knobStroke, 0.12, { Transparency = held and 0.2 or 0 })
+            end
+        end
+
+        click.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                setKnobHeld(true)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                if isKnobHeld then setKnobHeld(false) end
+            end
+        end)
 
         valBtn.MouseButton1Click:Connect(function()
             valText.Visible = false
@@ -4703,12 +4899,12 @@ function SwatUI:_ExtendTab(tab)
     function tab:CreateThemePreset(cfg)
         cfg = cfg or {}
         local presets = cfg.Presets or {
-            { Name = "Blue",   Colors = { Accent = Color3.fromRGB(96,176,255),  AccentHover = Color3.fromRGB(140,200,255), AccentDark = Color3.fromRGB(44,100,178)  } },
+            { Name = "Blue",   Colors = { Accent = Color3.fromRGB(88,190,255), AccentHover = Color3.fromRGB(160,220,255), AccentDark = Color3.fromRGB(36,108,200)  } },
             { Name = "Red",    Colors = { Accent = Color3.fromRGB(255,100,100), AccentHover = Color3.fromRGB(255,140,140), AccentDark = Color3.fromRGB(160,40,40)   } },
-            { Name = "Green",  Colors = { Accent = Color3.fromRGB(88,220,140),  AccentHover = Color3.fromRGB(120,240,170), AccentDark = Color3.fromRGB(40,130,80)   } },
-            { Name = "Purple", Colors = { Accent = Color3.fromRGB(196,110,255), AccentHover = Color3.fromRGB(214,150,255), AccentDark = Color3.fromRGB(100,50,160)  } },
-            { Name = "Orange", Colors = { Accent = Color3.fromRGB(255,160,60),  AccentHover = Color3.fromRGB(255,190,110), AccentDark = Color3.fromRGB(160,90,30)   } },
-            { Name = "Pink",   Colors = { Accent = Color3.fromRGB(255,120,190), AccentHover = Color3.fromRGB(255,160,215), AccentDark = Color3.fromRGB(160,50,110)  } },
+            { Name = "Green",  Colors = { Accent = Color3.fromRGB(80,235,145),  AccentHover = Color3.fromRGB(120,240,170), AccentDark = Color3.fromRGB(40,130,80)   } },
+            { Name = "Purple", Colors = { Accent = Color3.fromRGB(200,96,255), AccentHover = Color3.fromRGB(214,150,255), AccentDark = Color3.fromRGB(100,50,160)  } },
+            { Name = "Orange", Colors = { Accent = Color3.fromRGB(255,160,64),  AccentHover = Color3.fromRGB(255,190,110), AccentDark = Color3.fromRGB(160,90,30)   } },
+            { Name = "Pink",   Colors = { Accent = Color3.fromRGB(255,120,200), AccentHover = Color3.fromRGB(255,160,215), AccentDark = Color3.fromRGB(160,50,110)  } },
         }
 
         local frame = Create("Frame", {
@@ -4756,4 +4952,3 @@ function SwatUI:_ExtendTab(tab)
 end
 
 return SwatUI
-
